@@ -6,7 +6,9 @@ The library targets `netstandard2.0`, so it can be consumed by .NET Framework 4.
 
 ## Install
 
-Until the package is published, add a project reference to `GeoTileCover`.
+```bash
+dotnet add package GeoTileCover --version 0.1.0-preview.1
+```
 
 ## Usage
 
@@ -21,7 +23,7 @@ using NetTopologySuite.Geometries;
 var geometry = new GeometryFactory().CreatePoint(new Coordinate(105.8342, 21.0278));
 foreach (var tile in TileCover.GetTiles(geometry, minZoom: 10, maxZoom: 12))
 {
-    Console.WriteLine(tile); // z/x/y, e.g. 10/813/449
+    Console.WriteLine(tile); // z/x/y, e.g. 10/813/450
     Console.WriteLine(tile.Id); // stable, collision-free 64-bit numeric ID
 }
 ```
@@ -38,3 +40,11 @@ GeoTileCover.Tests/  unit tests
 ```
 
 The repository root deliberately stays language-neutral; Java and Go implementations can be added later without renaming the repository.
+
+## Feedback
+
+Report bugs and propose features through [GitHub Issues](https://github.com/omyto/geo-tile-cover/issues).
+
+## License
+
+GeoTileCover is licensed under the [MIT License](LICENSE).

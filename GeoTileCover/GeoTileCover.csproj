@@ -5,11 +5,16 @@
     <Nullable>enable</Nullable>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>GeoTileCover</PackageId>
-    <Authors>GeoTileCover contributors</Authors>
+    <PackageVersion>0.1.0-preview.1</PackageVersion>
+    <Authors>Omyto</Authors>
     <Description>Cover WGS84 geometries with Web Mercator XYZ tiles.</Description>
-    <PackageTags>geospatial;tiles;xyz;web-mercator</PackageTags>
+    <PackageTags>geospatial;tiles;xyz;web-mercator;tile-cover</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/omyto/geo-tile-cover</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/omyto/geo-tile-cover.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="NetTopologySuite" Version="2.6.0" />
