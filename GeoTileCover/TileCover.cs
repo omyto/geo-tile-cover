@@ -17,6 +17,9 @@ public static class TileCover
     public static IEnumerable<TileId> GetTiles(Geometry geometry, int zoom) => GetTiles(geometry, zoom, zoom);
 
     /// <summary>Gets tiles covered by a WGS84 geometry at every zoom level in the inclusive range from 0 through 25.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">A zoom or geometry coordinate is outside the supported range.</exception>
+    /// <exception cref="ArgumentException">The geometry SRID is neither 0 nor 4326.</exception>
+    /// <exception cref="NotSupportedException">A geometry segment crosses the antimeridian and must be split first.</exception>
     public static IEnumerable<TileId> GetTiles(Geometry geometry, int minZoom, int maxZoom)
     {
         if (geometry == null)
@@ -41,6 +44,7 @@ public static class TileCover
             yield break;
         }
 
+        GeometryValidator.Validate(geometry);
         foreach (var tile in TileCoverAlgorithm.GetTiles(geometry, minZoom, maxZoom))
         {
             yield return tile;

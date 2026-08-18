@@ -73,4 +73,55 @@ public sealed class TileCoverValidationTests
         var empty = new GeometryFactory().CreatePolygon();
         Assert.Empty(TileCover.GetTiles(empty, 0, 3));
     }
+
+    [Theory]
+    [InlineData(-180.000001, 0)]
+    [InlineData(180.000001, 0)]
+    [InlineData(0, -85.051129)]
+    [InlineData(0, 85.051129)]
+    [InlineData(double.PositiveInfinity, 0)]
+    [InlineData(0, double.NegativeInfinity)]
+    public void Rejects_coordinates_outside_web_mercator_bounds(double longitude, double latitude)
+    {
+        var point = new GeometryFactory().CreatePoint(new Coordinate(longitude, latitude));
+        Assert.Throws<ArgumentOutOfRangeException>(() => TileCover.GetTiles(point, 1).ToArray());
+    }
+
+    [Fact]
+    public void Accepts_coordinates_on_web_mercator_bounds()
+    {
+        var factory = new GeometryFactory();
+        var northWest = factory.CreatePoint(new Coordinate(-180, 85.0511287798066));
+        var southEast = factory.CreatePoint(new Coordinate(180, -85.0511287798066));
+
+        Assert.NotEmpty(TileCover.GetTiles(northWest, 1));
+        Assert.NotEmpty(TileCover.GetTiles(southEast, 1));
+    }
+
+    [Fact]
+    public void Rejects_line_crossing_the_antimeridian()
+    {
+        var line = new GeometryFactory().CreateLineString(new[]
+        {
+            new Coordinate(179, 10),
+            new Coordinate(-179, 10)
+        });
+
+        Assert.Throws<NotSupportedException>(() => TileCover.GetTiles(line, 1).ToArray());
+    }
+
+    [Fact]
+    public void Rejects_polygon_crossing_the_antimeridian()
+    {
+        var polygon = new GeometryFactory().CreatePolygon(new[]
+        {
+            new Coordinate(179, 10),
+            new Coordinate(-179, 10),
+            new Coordinate(-179, -10),
+            new Coordinate(179, -10),
+            new Coordinate(179, 10)
+        });
+
+        Assert.Throws<NotSupportedException>(() => TileCover.GetTiles(polygon, 1).ToArray());
+    }
 }

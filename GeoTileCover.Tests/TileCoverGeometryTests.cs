@@ -119,6 +119,54 @@ public sealed class TileCoverGeometryTests
         Assert.Equal(new[] { new TileId(1, 0, 1) }, TileCover.GetTiles(polygon, 1));
     }
 
+    [Fact]
+    public void Vertical_line_on_tile_boundary_belongs_to_eastern_tile()
+    {
+        var line = Factory.CreateLineString(new[]
+        {
+            new Coordinate(0, 10),
+            new Coordinate(0, 20)
+        });
+
+        Assert.Equal(new[] { new TileId(1, 1, 0) }, TileCover.GetTiles(line, 1));
+    }
+
+    [Fact]
+    public void Horizontal_line_on_tile_boundary_belongs_to_southern_tile()
+    {
+        var line = Factory.CreateLineString(new[]
+        {
+            new Coordinate(10, 0),
+            new Coordinate(20, 0)
+        });
+
+        Assert.Equal(new[] { new TileId(1, 1, 1) }, TileCover.GetTiles(line, 1));
+    }
+
+    [Fact]
+    public void Line_endpoint_touch_does_not_include_neighboring_tile()
+    {
+        var line = Factory.CreateLineString(new[]
+        {
+            new Coordinate(-10, 20),
+            new Coordinate(0, 20)
+        });
+
+        Assert.Equal(new[] { new TileId(1, 0, 0) }, TileCover.GetTiles(line, 1));
+    }
+
+    [Fact]
+    public void Point_supports_zoom_24_and_25()
+    {
+        var point = Factory.CreatePoint(new Coordinate(0, 0));
+
+        Assert.Equal(new[]
+        {
+            new TileId(24, 8388608, 8388608),
+            new TileId(25, 16777216, 16777216)
+        }, TileCover.GetTiles(point, 24, 25));
+    }
+
     private static Polygon Rectangle(double minX, double minY, double maxX, double maxY) =>
         Factory.CreatePolygon(new[]
         {

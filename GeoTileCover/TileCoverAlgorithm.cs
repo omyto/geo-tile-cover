@@ -78,7 +78,7 @@ internal static class TileCoverAlgorithm
 
         if (tile.Z == targetZoom)
         {
-            if (source.Relate(tileGeometry).Matches("T********"))
+            if (IntersectsTileInterior(source, tileGeometry) || LineBoundaryBelongsToTile(source, tileGeometry, tile))
             {
                 result.Add(tile);
             }
@@ -93,6 +93,50 @@ internal static class TileCoverAlgorithm
         Visit(new TileId(z, x + 1, y), targetZoom, source, prepared, result);
         Visit(new TileId(z, x, y + 1), targetZoom, source, prepared, result);
         Visit(new TileId(z, x + 1, y + 1), targetZoom, source, prepared, result);
+    }
+
+    private static bool IntersectsTileInterior(Geometry source, Geometry tileGeometry)
+    {
+        return source.Relate(tileGeometry).Matches("T********");
+    }
+
+    private static bool LineBoundaryBelongsToTile(Geometry source, Geometry tileGeometry, TileId tile)
+    {
+        if (!(source is LineString))
+        {
+            return false;
+        }
+
+        return LineIntersectionBelongsToTile(source.Intersection(tileGeometry), tile);
+    }
+
+    private static bool LineIntersectionBelongsToTile(Geometry intersection, TileId tile)
+    {
+        if (intersection.IsEmpty)
+        {
+            return false;
+        }
+
+        if (intersection is GeometryCollection collection)
+        {
+            for (var index = 0; index < collection.NumGeometries; index++)
+            {
+                if (LineIntersectionBelongsToTile(collection.GetGeometryN(index), tile))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        if (intersection.Dimension != Dimension.Curve)
+        {
+            return false;
+        }
+
+        var coordinate = intersection.InteriorPoint.Coordinate;
+        return coordinate != null && TileMath.ToTile(coordinate.X, coordinate.Y, tile.Z) == tile;
     }
 
     private sealed class TileIdComparer : IComparer<TileId>

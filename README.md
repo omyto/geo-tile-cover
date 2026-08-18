@@ -14,6 +14,8 @@ dotnet add package GeoTileCover --version 0.1.0-preview.1
 
 Input geometries use WGS84 coordinate order: **X = longitude, Y = latitude**.
 
+Longitude must be within **-180–180°** and latitude within the Web Mercator limit of **±85.0511287798066°**. Out-of-range coordinates are rejected. Geometry segments that cross the antimeridian are also rejected and must be split before calling the library.
+
 Supported zoom levels are exposed as `TileCover.MinZoom` and `TileCover.MaxZoom`; the current inclusive range is **0–25**.
 
 ```csharp
@@ -30,7 +32,7 @@ foreach (var tile in TileCover.GetTiles(geometry, minZoom: 10, maxZoom: 12))
 
 `TileId.Id` packs Z, X, and Y into a `long`. It can be restored with `new TileId(id)`.
 
-`GetTiles` returns every tile covered by the input geometry, ordered by zoom, then row (`y`), then column (`x`). Points on tile edges or corners belong to exactly one XYZ tile. For non-point geometries, touching only a tile boundary does not include the neighboring tile. The algorithm traverses the XYZ quadtree and prunes branches that do not intersect the geometry instead of enumerating every tile in its bounding box. Coordinates are interpreted as WGS84 degrees and projected according to the standard Web Mercator tile scheme. Split geometries that cross the antimeridian before covering them.
+`GetTiles` returns every tile covered by the input geometry, ordered by zoom, then row (`y`), then column (`x`). Points on tile edges or corners belong to exactly one XYZ tile. A line on a vertical boundary belongs to the eastern tile, while a line on a horizontal boundary belongs to the southern tile. A polygon or line endpoint touching only a tile boundary does not include the neighboring tile. The algorithm traverses the XYZ quadtree and prunes branches that do not intersect the geometry instead of enumerating every tile in its bounding box.
 
 ## Layout
 
