@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="GeoTileCover/GeoTileCover.csproj" />
+  <Project Path="GeoTileCover.Tests/GeoTileCover.Tests.csproj" />
+</Solution>
