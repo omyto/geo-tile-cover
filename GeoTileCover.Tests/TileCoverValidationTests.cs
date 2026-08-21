@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using NetTopologySuite.Geometries;
 using Xunit;
@@ -10,7 +11,13 @@ public sealed class TileCoverValidationTests
     [Fact]
     public void Rejects_null_geometry()
     {
-        Assert.Throws<ArgumentNullException>(() => new TileCover(null!));
+        Assert.Throws<ArgumentNullException>(() => new TileCover((Geometry)null!));
+    }
+
+    [Fact]
+    public void Rejects_null_tile_collection()
+    {
+        Assert.Throws<ArgumentNullException>(() => new TileCover((IEnumerable<TileId>)null!));
     }
 
     [Theory]

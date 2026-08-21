@@ -127,15 +127,4 @@ internal static class TileCoverAlgorithm
         var coordinate = intersection.InteriorPoint.Coordinate;
         return coordinate != null && TileMath.ToTile(coordinate.X, coordinate.Y, tile.Z) == tile;
     }
-
-    private sealed class TileIdComparer : IComparer<TileId>
-    {
-        public static readonly TileIdComparer Instance = new TileIdComparer();
-
-        public int Compare(TileId left, TileId right)
-        {
-            var byY = left.Y.CompareTo(right.Y);
-            return byY != 0 ? byY : left.X.CompareTo(right.X);
-        }
-    }
 }

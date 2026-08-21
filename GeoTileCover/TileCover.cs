@@ -4,7 +4,7 @@ using NetTopologySuite.Geometries;
 
 namespace GeoTileCover;
 
-/// <summary>Computes Web Mercator XYZ tile coverage for a WGS84 geometry.</summary>
+/// <summary>Computes Web Mercator XYZ tile coverage for a WGS84 geometry or a union of fully covered tiles.</summary>
 public sealed class TileCover
 {
     /// <summary>The lowest supported XYZ zoom level.</summary>
@@ -15,7 +15,8 @@ public sealed class TileCover
 
     private readonly object _cacheLock = new object();
     private readonly Dictionary<int, TileId[]> _tilesByZoom = new Dictionary<int, TileId[]>();
-    private readonly Geometry _geometry;
+    private readonly CanonicalTileUnion? _tileUnion;
+    private readonly Geometry? _geometry;
 
     /// <summary>Creates a tile cover for a WGS84 geometry.</summary>
     /// <exception cref="ArgumentNullException"><paramref name="geometry"/> is null.</exception>
@@ -41,10 +42,18 @@ public sealed class TileCover
         }
     }
 
-    /// <summary>Gets tiles covered by the geometry at one zoom level from 0 through 25.</summary>
+    /// <summary>Creates a tile cover from the union of fully covered XYZ tiles.</summary>
+    /// <remarks>Source tiles may use different zoom levels. Redundant descendants and complete groups of siblings are compacted without expanding tiles to a common zoom.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="tiles"/> is null.</exception>
+    public TileCover(IEnumerable<TileId> tiles)
+    {
+        _tileUnion = new CanonicalTileUnion(tiles);
+    }
+
+    /// <summary>Gets tiles covered by this cover at one zoom level from 0 through 25.</summary>
     public IEnumerable<TileId> GetTiles(int zoom) => GetTiles(zoom, zoom);
 
-    /// <summary>Gets tiles covered by the geometry at every zoom level in the inclusive range from 0 through 25.</summary>
+    /// <summary>Gets tiles covered by this cover at every zoom level in the inclusive range from 0 through 25.</summary>
     /// <exception cref="ArgumentOutOfRangeException">A zoom is outside the supported range or <paramref name="maxZoom"/> is less than <paramref name="minZoom"/>.</exception>
     public IEnumerable<TileId> GetTiles(int minZoom, int maxZoom)
     {
@@ -79,7 +88,9 @@ public sealed class TileCover
 
         if (sourceZoom > MaxZoom)
         {
-            _tilesByZoom[maxZoom] = TileCoverAlgorithm.GetTilesAtZoom(_geometry, maxZoom);
+            _tilesByZoom[maxZoom] = _geometry != null
+                ? TileCoverAlgorithm.GetTilesAtZoom(_geometry, maxZoom)
+                : _tileUnion!.GetTiles(maxZoom);
             sourceZoom = maxZoom;
         }
 
