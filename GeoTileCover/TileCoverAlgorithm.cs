@@ -6,40 +6,29 @@ namespace GeoTileCover;
 
 internal static class TileCoverAlgorithm
 {
-    public static IEnumerable<TileId> GetTiles(Geometry geometry, int minZoom, int maxZoom)
-    {
-        var maxZoomTiles = CoverAtZoom(geometry, maxZoom);
-        var levels = new List<HashSet<TileId>>(maxZoom - minZoom + 1) { maxZoomTiles };
-        var current = maxZoomTiles;
-
-        for (var zoom = maxZoom - 1; zoom >= minZoom; zoom--)
-        {
-            var parents = new HashSet<TileId>();
-            foreach (var tile in current)
-            {
-                parents.Add(tile.Parent());
-            }
-
-            levels.Add(parents);
-            current = parents;
-        }
-
-        for (var level = levels.Count - 1; level >= 0; level--)
-        {
-            var ordered = new List<TileId>(levels[level]);
-            ordered.Sort(TileIdComparer.Instance);
-            foreach (var tile in ordered)
-            {
-                yield return tile;
-            }
-        }
-    }
-
-    private static HashSet<TileId> CoverAtZoom(Geometry geometry, int zoom)
+    public static TileId[] GetTilesAtZoom(Geometry geometry, int zoom)
     {
         var result = new HashSet<TileId>();
         CollectAtZoom(geometry, zoom, result);
-        return result;
+        return Sort(result);
+    }
+
+    public static TileId[] GetParentTiles(IEnumerable<TileId> tiles)
+    {
+        var parents = new HashSet<TileId>();
+        foreach (var tile in tiles)
+        {
+            parents.Add(tile.Parent());
+        }
+
+        return Sort(parents);
+    }
+
+    private static TileId[] Sort(HashSet<TileId> tiles)
+    {
+        var ordered = new List<TileId>(tiles);
+        ordered.Sort(TileIdComparer.Instance);
+        return ordered.ToArray();
     }
 
     private static void CollectAtZoom(Geometry geometry, int zoom, HashSet<TileId> result)

@@ -4,8 +4,8 @@ using NetTopologySuite.Geometries;
 
 namespace GeoTileCover;
 
-/// <summary>Computes Web Mercator XYZ tile coverage for WGS84 geometries.</summary>
-public static class TileCover
+/// <summary>Computes Web Mercator XYZ tile coverage for a WGS84 geometry.</summary>
+public sealed class TileCover
 {
     /// <summary>The lowest supported XYZ zoom level.</summary>
     public const int MinZoom = 0;
@@ -13,20 +13,41 @@ public static class TileCover
     /// <summary>The highest supported XYZ zoom level.</summary>
     public const int MaxZoom = 25;
 
-    /// <summary>Gets tiles covered by a WGS84 geometry at one zoom level from 0 through 25.</summary>
-    public static IEnumerable<TileId> GetTiles(Geometry geometry, int zoom) => GetTiles(geometry, zoom, zoom);
+    private readonly object _cacheLock = new object();
+    private readonly Dictionary<int, TileId[]> _tilesByZoom = new Dictionary<int, TileId[]>();
+    private readonly Geometry _geometry;
 
-    /// <summary>Gets tiles covered by a WGS84 geometry at every zoom level in the inclusive range from 0 through 25.</summary>
-    /// <exception cref="ArgumentOutOfRangeException">A zoom or geometry coordinate is outside the supported range.</exception>
+    /// <summary>Creates a tile cover for a WGS84 geometry.</summary>
+    /// <exception cref="ArgumentNullException"><paramref name="geometry"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">A geometry coordinate is outside the supported range.</exception>
     /// <exception cref="ArgumentException">The geometry SRID is neither 0 nor 4326.</exception>
     /// <exception cref="NotSupportedException">A geometry segment crosses the antimeridian and must be split first.</exception>
-    public static IEnumerable<TileId> GetTiles(Geometry geometry, int minZoom, int maxZoom)
+    public TileCover(Geometry geometry)
     {
         if (geometry == null)
         {
             throw new ArgumentNullException(nameof(geometry));
         }
 
+        _geometry = (Geometry)geometry.Copy();
+        if (_geometry.SRID != 0 && _geometry.SRID != 4326)
+        {
+            throw new ArgumentException("Geometry SRID must be 0 or 4326.", nameof(geometry));
+        }
+
+        if (!_geometry.IsEmpty)
+        {
+            GeometryValidator.Validate(_geometry);
+        }
+    }
+
+    /// <summary>Gets tiles covered by the geometry at one zoom level from 0 through 25.</summary>
+    public IEnumerable<TileId> GetTiles(int zoom) => GetTiles(zoom, zoom);
+
+    /// <summary>Gets tiles covered by the geometry at every zoom level in the inclusive range from 0 through 25.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">A zoom is outside the supported range or <paramref name="maxZoom"/> is less than <paramref name="minZoom"/>.</exception>
+    public IEnumerable<TileId> GetTiles(int minZoom, int maxZoom)
+    {
         TileMath.TilesPerAxis(minZoom);
         TileMath.TilesPerAxis(maxZoom);
         if (maxZoom < minZoom)
@@ -34,20 +55,51 @@ public static class TileCover
             throw new ArgumentOutOfRangeException(nameof(maxZoom), "maxZoom cannot be less than minZoom.");
         }
 
-        if (geometry.SRID != 0 && geometry.SRID != 4326)
+        TileId[][] levels;
+        lock (_cacheLock)
         {
-            throw new ArgumentException("Geometry SRID must be 0 or 4326.", nameof(geometry));
+            EnsureCached(minZoom, maxZoom);
+            levels = new TileId[maxZoom - minZoom + 1][];
+            for (var zoom = minZoom; zoom <= maxZoom; zoom++)
+            {
+                levels[zoom - minZoom] = _tilesByZoom[zoom];
+            }
         }
 
-        if (geometry.IsEmpty)
+        return Enumerate(levels);
+    }
+
+    private void EnsureCached(int minZoom, int maxZoom)
+    {
+        var sourceZoom = maxZoom;
+        while (sourceZoom <= MaxZoom && !_tilesByZoom.ContainsKey(sourceZoom))
         {
-            yield break;
+            sourceZoom++;
         }
 
-        GeometryValidator.Validate(geometry);
-        foreach (var tile in TileCoverAlgorithm.GetTiles(geometry, minZoom, maxZoom))
+        if (sourceZoom > MaxZoom)
         {
-            yield return tile;
+            _tilesByZoom[maxZoom] = TileCoverAlgorithm.GetTilesAtZoom(_geometry, maxZoom);
+            sourceZoom = maxZoom;
+        }
+
+        for (var zoom = sourceZoom - 1; zoom >= minZoom; zoom--)
+        {
+            if (!_tilesByZoom.ContainsKey(zoom))
+            {
+                _tilesByZoom[zoom] = TileCoverAlgorithm.GetParentTiles(_tilesByZoom[zoom + 1]);
+            }
+        }
+    }
+
+    private static IEnumerable<TileId> Enumerate(TileId[][] levels)
+    {
+        foreach (var tiles in levels)
+        {
+            foreach (var tile in tiles)
+            {
+                yield return tile;
+            }
         }
     }
 }

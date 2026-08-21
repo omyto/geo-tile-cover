@@ -23,7 +23,8 @@ using GeoTileCover;
 using NetTopologySuite.Geometries;
 
 var geometry = new GeometryFactory().CreatePoint(new Coordinate(105.8342, 21.0278));
-foreach (var tile in TileCover.GetTiles(geometry, minZoom: 10, maxZoom: 12))
+var cover = new TileCover(geometry);
+foreach (var tile in cover.GetTiles(minZoom: 10, maxZoom: 12))
 {
     Console.WriteLine(tile); // z/x/y, e.g. 10/813/450
     Console.WriteLine(tile.Id); // stable, collision-free 64-bit numeric ID
@@ -31,6 +32,8 @@ foreach (var tile in TileCover.GetTiles(geometry, minZoom: 10, maxZoom: 12))
 ```
 
 `TileId.Id` packs Z, X, and Y into a `long`. It can be restored with `new TileId(id)`.
+
+`TileCover` takes a snapshot of the input geometry. Tile results are computed lazily and cached by zoom on the instance, so repeated and overlapping `GetTiles` calls reuse prior work.
 
 `GetTiles` returns every tile covered by the input geometry, ordered by zoom, then row (`y`), then column (`x`). Points on tile edges or corners belong to exactly one XYZ tile. A line on a vertical boundary belongs to the eastern tile, while a line on a horizontal boundary belongs to the southern tile. A polygon or line endpoint touching only a tile boundary does not include the neighboring tile. The algorithm traverses the XYZ quadtree and prunes branches that do not intersect the geometry instead of enumerating every tile in its bounding box.
 

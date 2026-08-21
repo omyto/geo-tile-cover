@@ -8,9 +8,9 @@ namespace GeoTileCover.Tests;
 public sealed class TileCoverValidationTests
 {
     [Fact]
-    public void Rejects_null_geometry_when_results_are_enumerated()
+    public void Rejects_null_geometry()
     {
-        Assert.Throws<ArgumentNullException>(() => TileCover.GetTiles(null!, 1).ToArray());
+        Assert.Throws<ArgumentNullException>(() => new TileCover(null!));
     }
 
     [Theory]
@@ -21,14 +21,15 @@ public sealed class TileCoverValidationTests
     public void Rejects_zoom_outside_supported_range(int minZoom, int maxZoom, bool useSingleZoomOverload)
     {
         var point = new GeometryFactory().CreatePoint(new Coordinate(10, 10));
+        var cover = new TileCover(point);
 
         if (useSingleZoomOverload)
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() => TileCover.GetTiles(point, minZoom).ToArray());
+            Assert.Throws<ArgumentOutOfRangeException>(() => cover.GetTiles(minZoom));
         }
         else
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() => TileCover.GetTiles(point, minZoom, maxZoom).ToArray());
+            Assert.Throws<ArgumentOutOfRangeException>(() => cover.GetTiles(minZoom, maxZoom));
         }
     }
 
@@ -36,7 +37,8 @@ public sealed class TileCoverValidationTests
     public void Rejects_max_zoom_less_than_min_zoom()
     {
         var point = new GeometryFactory().CreatePoint(new Coordinate(10, 10));
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => TileCover.GetTiles(point, minZoom: 5, maxZoom: 4).ToArray());
+        var cover = new TileCover(point);
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => cover.GetTiles(minZoom: 5, maxZoom: 4));
 
         Assert.Equal("maxZoom", exception.ParamName);
     }
@@ -54,15 +56,15 @@ public sealed class TileCoverValidationTests
         var unspecified = new GeometryFactory(new PrecisionModel(), srid: 0).CreatePoint(new Coordinate(10, 10));
         var wgs84 = new GeometryFactory(new PrecisionModel(), srid: 4326).CreatePoint(new Coordinate(10, 10));
 
-        Assert.NotEmpty(TileCover.GetTiles(unspecified, 1));
-        Assert.NotEmpty(TileCover.GetTiles(wgs84, 1));
+        Assert.NotEmpty(new TileCover(unspecified).GetTiles(1));
+        Assert.NotEmpty(new TileCover(wgs84).GetTiles(1));
     }
 
     [Fact]
     public void Rejects_non_wgs84_srid()
     {
         var geometry = new GeometryFactory(new PrecisionModel(), srid: 3857).CreatePoint(new Coordinate(0, 0));
-        var exception = Assert.Throws<ArgumentException>(() => TileCover.GetTiles(geometry, 1).ToArray());
+        var exception = Assert.Throws<ArgumentException>(() => new TileCover(geometry));
 
         Assert.Equal("geometry", exception.ParamName);
     }
@@ -71,7 +73,7 @@ public sealed class TileCoverValidationTests
     public void Empty_geometry_returns_no_tiles()
     {
         var empty = new GeometryFactory().CreatePolygon();
-        Assert.Empty(TileCover.GetTiles(empty, 0, 3));
+        Assert.Empty(new TileCover(empty).GetTiles(0, 3));
     }
 
     [Theory]
@@ -84,7 +86,7 @@ public sealed class TileCoverValidationTests
     public void Rejects_coordinates_outside_web_mercator_bounds(double longitude, double latitude)
     {
         var point = new GeometryFactory().CreatePoint(new Coordinate(longitude, latitude));
-        Assert.Throws<ArgumentOutOfRangeException>(() => TileCover.GetTiles(point, 1).ToArray());
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TileCover(point));
     }
 
     [Fact]
@@ -94,8 +96,8 @@ public sealed class TileCoverValidationTests
         var northWest = factory.CreatePoint(new Coordinate(-180, 85.0511287798066));
         var southEast = factory.CreatePoint(new Coordinate(180, -85.0511287798066));
 
-        Assert.NotEmpty(TileCover.GetTiles(northWest, 1));
-        Assert.NotEmpty(TileCover.GetTiles(southEast, 1));
+        Assert.NotEmpty(new TileCover(northWest).GetTiles(1));
+        Assert.NotEmpty(new TileCover(southEast).GetTiles(1));
     }
 
     [Fact]
@@ -107,7 +109,7 @@ public sealed class TileCoverValidationTests
             new Coordinate(-179, 10)
         });
 
-        Assert.Throws<NotSupportedException>(() => TileCover.GetTiles(line, 1).ToArray());
+        Assert.Throws<NotSupportedException>(() => new TileCover(line));
     }
 
     [Fact]
@@ -122,6 +124,6 @@ public sealed class TileCoverValidationTests
             new Coordinate(179, 10)
         });
 
-        Assert.Throws<NotSupportedException>(() => TileCover.GetTiles(polygon, 1).ToArray());
+        Assert.Throws<NotSupportedException>(() => new TileCover(polygon));
     }
 }
