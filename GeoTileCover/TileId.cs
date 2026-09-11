@@ -5,6 +5,7 @@ namespace GeoTileCover;
 /// <summary>Identifies one Web Mercator XYZ tile.</summary>
 public readonly struct TileId : IEquatable<TileId>
 {
+    private const int PackedXYMaxZoom = 16;
     private const int CoordinateBits = TileCover.MaxZoom;
     private const int ZoomShift = CoordinateBits * 2;
     private const long CoordinateMask = (1L << CoordinateBits) - 1;
@@ -24,6 +25,32 @@ public readonly struct TileId : IEquatable<TileId>
         if (y < 0 || y >= tilesPerAxis)
         {
             throw new ArgumentOutOfRangeException(nameof(y));
+        }
+
+        Z = z;
+        X = x;
+        Y = y;
+    }
+
+    /// <summary>Creates a tile from its zoom level and opaque 32-bit packed X/Y representation.</summary>
+    /// <param name="z">Zoom level from <see cref="TileCover.MinZoom"/> through <see cref="TileCover.MaxZoom"/>.</param>
+    /// <param name="packedXY">X and Y packed into <c>2 * z</c> bits. The value may be negative at zoom 16.</param>
+    public TileId(int z, int packedXY)
+    {
+        var tilesPerAxis = TileMath.TilesPerAxis(z);
+        if (z > PackedXYMaxZoom)
+        {
+            throw new ArgumentOutOfRangeException(nameof(z), $"Zoom must be {PackedXYMaxZoom} or lower when using packed XY.");
+        }
+
+        var bits = unchecked((uint)packedXY);
+        var coordinateMask = (1u << z) - 1;
+        var x = (int)(bits >> z);
+        var y = (int)(bits & coordinateMask);
+
+        if (x >= tilesPerAxis || y >= tilesPerAxis)
+        {
+            throw new ArgumentOutOfRangeException(nameof(packedXY), "Packed XY contains coordinates outside the encoded zoom grid.");
         }
 
         Z = z;
@@ -62,6 +89,36 @@ public readonly struct TileId : IEquatable<TileId>
 
     /// <summary>Gets the zero-based tile row.</summary>
     public int Y { get; }
+
+    /// <summary>Gets the opaque 32-bit packed X/Y representation, unique within <see cref="Z"/>. The value may be negative at zoom 16.</summary>
+    /// <exception cref="InvalidOperationException"><see cref="Z"/> is greater than 16.</exception>
+    public int PackedXY
+    {
+        get
+        {
+            if (!TryGetPackedXY(out var packedXY))
+            {
+                throw new InvalidOperationException($"Packed XY is only available through zoom {PackedXYMaxZoom}.");
+            }
+
+            return packedXY;
+        }
+    }
+
+    /// <summary>Attempts to get the opaque 32-bit packed X/Y representation.</summary>
+    /// <param name="packedXY">When this method returns true, contains X and Y packed into <c>2 * Z</c> bits.</param>
+    /// <returns>True when <see cref="Z"/> is 16 or lower; otherwise, false.</returns>
+    public bool TryGetPackedXY(out int packedXY)
+    {
+        if (Z > PackedXYMaxZoom)
+        {
+            packedXY = default;
+            return false;
+        }
+
+        packedXY = unchecked((int)(((uint)X << Z) | (uint)Y));
+        return true;
+    }
 
     /// <summary>Gets the stable, collision-free numeric ID packed as 5-bit Z, 25-bit X, and 25-bit Y.</summary>
     public long Id => ((long)Z << ZoomShift) | ((long)X << CoordinateBits) | (uint)Y;

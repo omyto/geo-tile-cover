@@ -33,6 +33,8 @@ foreach (var tile in cover.GetTiles(minZoom: 10, maxZoom: 12))
 
 `TileId.Id` packs Z, X, and Y into a `long`. It can be restored with `new TileId(id)`.
 
+`TileId.PackedXY` packs X and Y into an opaque `int` for zoom levels 0 through 16. It is unique within the tile's zoom level and can be restored together with Z using `new TileId(z, packedXY)`. The packed value uses all 32 bits and may therefore be negative at zoom 16. Use `TryGetPackedXY` when a tile may be above zoom 16.
+
 `TileCover` takes a snapshot of the input geometry. Tile results are computed lazily and cached by zoom on the instance, so repeated and overlapping `GetTiles` calls reuse prior work.
 
 A cover can also be restored from fully covered tiles, including tiles at different zoom levels:
