@@ -1,6 +1,6 @@
 # Tasks
 
-## Minimum gate for `0.1.0-preview.1`
+## Minimum gate for `0.1.0-preview`
 
 - [x] Add basic tests for Point, LineString, Polygon, MultiPolygon, and empty geometry.
 - [x] Define point ownership on tile edges and corners.

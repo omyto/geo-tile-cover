@@ -7,7 +7,7 @@ The library targets `netstandard2.0`, so it can be consumed by .NET Framework 4.
 ## Install
 
 ```bash
-dotnet add package GeoTileCover --version 0.1.0-preview.1
+dotnet add package GeoTileCover --version 0.1.0-preview.2
 ```
 
 ## Usage
