@@ -126,6 +126,17 @@ public sealed class TileIdTests
     }
 
     [Fact]
+    public void To_envelope_returns_wgs84_geographic_bounds()
+    {
+        var envelope = new TileId(1, 1, 0).ToEnvelope();
+
+        Assert.Equal(0d, envelope.MinX);
+        Assert.Equal(180d, envelope.MaxX);
+        Assert.Equal(0d, envelope.MinY, precision: 12);
+        Assert.Equal(85.0511287798066d, envelope.MaxY, precision: 12);
+    }
+
+    [Fact]
     public void Value_equality_supports_hash_based_deduplication()
     {
         var first = new TileId(8, 201, 114);

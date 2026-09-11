@@ -1,4 +1,5 @@
 using System;
+using NetTopologySuite.Geometries;
 
 namespace GeoTileCover;
 
@@ -133,6 +134,9 @@ public readonly struct TileId : IEquatable<TileId>
 
         return new TileId(Z - 1, X >> 1, Y >> 1);
     }
+
+    /// <summary>Creates the WGS84 geographic bounds of this tile, with X as longitude and Y as latitude.</summary>
+    public Envelope ToEnvelope() => TileMath.ToEnvelope(this);
 
     /// <inheritdoc/>
     public bool Equals(TileId other) => Z == other.Z && X == other.X && Y == other.Y;
