@@ -15,7 +15,7 @@ internal sealed class CanonicalTileUnion
             throw new ArgumentNullException(nameof(tiles));
         }
 
-        _tiles = Normalize(tiles);
+        _tiles = Normalize(tiles, TileCover.MinZoom, TileCover.MaxZoom);
     }
 
     public TileId[] GetTiles(int zoom)
@@ -36,7 +36,29 @@ internal sealed class CanonicalTileUnion
         return Sort(result);
     }
 
-    private static TileId[] Normalize(IEnumerable<TileId> tiles)
+    public TileId[] GetMinimalTiles(int minZoom, int maxZoom)
+    {
+        var bounded = new HashSet<TileId>();
+        foreach (var tile in _tiles)
+        {
+            if (tile.Z < minZoom)
+            {
+                AddDescendants(tile, minZoom, bounded);
+            }
+            else if (tile.Z > maxZoom)
+            {
+                bounded.Add(GetAncestor(tile, maxZoom));
+            }
+            else
+            {
+                bounded.Add(tile);
+            }
+        }
+
+        return Normalize(bounded, minZoom, maxZoom);
+    }
+
+    private static TileId[] Normalize(IEnumerable<TileId> tiles, int minZoom, int maxZoom)
     {
         var candidates = new List<TileId>(new HashSet<TileId>(tiles));
         candidates.Sort(TileIdComparer.Instance);
@@ -50,7 +72,7 @@ internal sealed class CanonicalTileUnion
             }
         }
 
-        for (var zoom = TileCover.MaxZoom; zoom > TileCover.MinZoom; zoom--)
+        for (var zoom = maxZoom; zoom > minZoom; zoom--)
         {
             CompactSiblings(normalized, zoom);
         }

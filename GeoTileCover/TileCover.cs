@@ -57,12 +57,7 @@ public sealed class TileCover
     /// <exception cref="ArgumentOutOfRangeException">A zoom is outside the supported range or <paramref name="maxZoom"/> is less than <paramref name="minZoom"/>.</exception>
     public IEnumerable<TileId> GetTiles(int minZoom, int maxZoom)
     {
-        TileMath.TilesPerAxis(minZoom);
-        TileMath.TilesPerAxis(maxZoom);
-        if (maxZoom < minZoom)
-        {
-            throw new ArgumentOutOfRangeException(nameof(maxZoom), "maxZoom cannot be less than minZoom.");
-        }
+        ValidateZoomRange(minZoom, maxZoom);
 
         TileId[][] levels;
         lock (_cacheLock)
@@ -76,6 +71,27 @@ public sealed class TileCover
         }
 
         return Enumerate(levels);
+    }
+
+    /// <summary>Gets the smallest mixed-zoom tile set between two zoom levels that covers this cover at <paramref name="maxZoom"/> resolution.</summary>
+    /// <remarks>Complete sibling groups are recursively replaced by their parent, stopping at <paramref name="minZoom"/>.</remarks>
+    /// <exception cref="ArgumentOutOfRangeException">A zoom is outside the supported range or <paramref name="maxZoom"/> is less than <paramref name="minZoom"/>.</exception>
+    public TileId[] GetMinimalTiles(int minZoom, int maxZoom)
+    {
+        ValidateZoomRange(minZoom, maxZoom);
+        if (_tileUnion != null)
+        {
+            return _tileUnion.GetMinimalTiles(minZoom, maxZoom);
+        }
+
+        TileId[] tilesAtMaxZoom;
+        lock (_cacheLock)
+        {
+            EnsureCached(maxZoom, maxZoom);
+            tilesAtMaxZoom = _tilesByZoom[maxZoom];
+        }
+
+        return new CanonicalTileUnion(tilesAtMaxZoom).GetMinimalTiles(minZoom, maxZoom);
     }
 
     private void EnsureCached(int minZoom, int maxZoom)
@@ -111,6 +127,16 @@ public sealed class TileCover
             {
                 yield return tile;
             }
+        }
+    }
+
+    private static void ValidateZoomRange(int minZoom, int maxZoom)
+    {
+        TileMath.TilesPerAxis(minZoom);
+        TileMath.TilesPerAxis(maxZoom);
+        if (maxZoom < minZoom)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxZoom), "maxZoom cannot be less than minZoom.");
         }
     }
 }

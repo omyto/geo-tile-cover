@@ -191,6 +191,24 @@ public sealed class TileCoverGeometryTests
         Assert.Equal(range, cover.GetTiles(1, 2));
     }
 
+    [Fact]
+    public void Minimal_tiles_compact_geometry_cover_between_requested_zooms()
+    {
+        var cover = Cover(Rectangle(10, 10, 100, 70));
+
+        Assert.Equal(new[] { new TileId(1, 1, 0) }, cover.GetMinimalTiles(1, 2));
+    }
+
+    [Fact]
+    public void Minimal_tiles_for_a_point_use_max_zoom()
+    {
+        var point = Factory.CreatePoint(new Coordinate(105.8342, 21.0278));
+
+        TileId[] tiles = Cover(point).GetMinimalTiles(0, 2);
+
+        Assert.Equal(new[] { new TileId(2, 3, 1) }, tiles);
+    }
+
     private static TileCover Cover(Geometry geometry) => new TileCover(geometry);
 
     private static Polygon Rectangle(double minX, double minY, double maxX, double maxY) =>

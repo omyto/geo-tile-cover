@@ -50,6 +50,27 @@ public sealed class TileCoverValidationTests
         Assert.Equal("maxZoom", exception.ParamName);
     }
 
+    [Theory]
+    [InlineData(-1, 1)]
+    [InlineData(0, 26)]
+    public void Minimal_tiles_reject_zoom_outside_supported_range(int minZoom, int maxZoom)
+    {
+        var point = new GeometryFactory().CreatePoint(new Coordinate(10, 10));
+        var cover = new TileCover(point);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => cover.GetMinimalTiles(minZoom, maxZoom));
+    }
+
+    [Fact]
+    public void Minimal_tiles_reject_max_zoom_less_than_min_zoom()
+    {
+        var point = new GeometryFactory().CreatePoint(new Coordinate(10, 10));
+        var cover = new TileCover(point);
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => cover.GetMinimalTiles(minZoom: 5, maxZoom: 4));
+
+        Assert.Equal("maxZoom", exception.ParamName);
+    }
+
     [Fact]
     public void Exposes_supported_zoom_range()
     {

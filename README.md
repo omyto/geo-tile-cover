@@ -51,6 +51,12 @@ Tile inputs are treated as a union of complete tile areas. The constructor snaps
 
 `GetTiles` returns every tile covered by the source, ordered by zoom, then row (`y`), then column (`x`). For geometry sources, points on tile edges or corners belong to exactly one XYZ tile. A line on a vertical boundary belongs to the eastern tile, while a line on a horizontal boundary belongs to the southern tile. A polygon or line endpoint touching only a tile boundary does not include the neighboring tile. The geometry algorithm traverses the XYZ quadtree and prunes branches that do not intersect the geometry instead of enumerating every tile in its bounding box.
 
+Use `GetMinimalTiles(minZoom, maxZoom)` to return the smallest mixed-zoom tile array that preserves the cover at `maxZoom` resolution. Complete groups of four sibling tiles are recursively replaced by their parent, stopping at `minZoom`.
+
+```csharp
+TileId[] minimalTiles = cover.GetMinimalTiles(minZoom: 10, maxZoom: 12);
+```
+
 ## Layout
 
 ```text

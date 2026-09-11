@@ -112,4 +112,67 @@ public sealed class TileCoverTileTests
         Assert.Equal(range.Where(tile => tile.Z == 1), cover.GetTiles(1));
         Assert.Equal(range, cover.GetTiles(1, 3));
     }
+
+    [Fact]
+    public void Minimal_tiles_compact_complete_siblings_only_to_min_zoom()
+    {
+        var cover = new TileCover(new[]
+        {
+            new TileId(2, 2, 2),
+            new TileId(2, 3, 2),
+            new TileId(2, 2, 3),
+            new TileId(2, 3, 3)
+        });
+
+        Assert.Equal(new[] { new TileId(1, 1, 1) }, cover.GetMinimalTiles(1, 2));
+        Assert.Equal(new[]
+        {
+            new TileId(2, 2, 2),
+            new TileId(2, 3, 2),
+            new TileId(2, 2, 3),
+            new TileId(2, 3, 3)
+        }, cover.GetMinimalTiles(2, 2));
+    }
+
+    [Fact]
+    public void Minimal_tiles_keep_an_already_minimal_mixed_zoom_union()
+    {
+        var cover = new TileCover(new[]
+        {
+            new TileId(1, 0, 0),
+            new TileId(2, 2, 0)
+        });
+
+        Assert.Equal(new[]
+        {
+            new TileId(1, 0, 0),
+            new TileId(2, 2, 0)
+        }, cover.GetMinimalTiles(1, 2));
+    }
+
+    [Fact]
+    public void Minimal_tiles_expand_sources_below_min_zoom_only_to_min_zoom()
+    {
+        var cover = new TileCover(new[] { new TileId(1, 0, 0) });
+
+        Assert.Equal(new[]
+        {
+            new TileId(2, 0, 0),
+            new TileId(2, 1, 0),
+            new TileId(2, 0, 1),
+            new TileId(2, 1, 1)
+        }, cover.GetMinimalTiles(2, 3));
+    }
+
+    [Fact]
+    public void Minimal_tiles_roll_sources_above_max_zoom_up_to_max_zoom()
+    {
+        var cover = new TileCover(new[]
+        {
+            new TileId(3, 0, 0),
+            new TileId(3, 1, 0)
+        });
+
+        Assert.Equal(new[] { new TileId(2, 0, 0) }, cover.GetMinimalTiles(1, 2));
+    }
 }
