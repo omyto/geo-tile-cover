@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using NetTopologySuite.Geometries;
 
 namespace GeoTileCover;
@@ -71,6 +72,80 @@ public sealed class TileCover
         }
 
         return Enumerate(levels);
+    }
+
+    /// <summary>Attempts to get the complete tile cover at one zoom without exceeding a limit on distinct tiles.</summary>
+    /// <param name="zoom">The zoom level from 0 through 25.</param>
+    /// <param name="maxTiles">The maximum number of distinct tiles allowed, including zero for an empty cover.</param>
+    /// <param name="tiles">The complete result ordered by row then column on success; an empty array when the limit is exceeded.</param>
+    /// <param name="cancellationToken">Cancels cache waits and tile traversal cooperatively.</param>
+    /// <returns>True if the complete result fits within the limit; otherwise, false.</returns>
+    /// <remarks>Only complete results are cached. The returned array can be modified without affecting the cache. Cancellation is checked between traversal steps, not inside individual geometry operations.</remarks>
+    /// <exception cref="ArgumentOutOfRangeException">The zoom is unsupported or maxTiles is negative.</exception>
+    /// <exception cref="OperationCanceledException">Cancellation is requested.</exception>
+    public bool TryGetTiles(int zoom, int maxTiles, out TileId[] tiles, CancellationToken cancellationToken = default)
+    {
+        TileMath.TilesPerAxis(zoom);
+        if (maxTiles < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxTiles));
+        }
+
+        tiles = Array.Empty<TileId>();
+        var lockTaken = false;
+        try
+        {
+            // Unlike lock, a bounded wait lets a disconnected caller cancel while another
+            // request is computing tiles on this instance.
+            while (!lockTaken)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Monitor.TryEnter(_cacheLock, 50, ref lockTaken);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_tilesByZoom.TryGetValue(zoom, out var complete))
+            {
+                if (complete.Length > maxTiles)
+                {
+                    return false;
+                }
+            }
+            else if (!TryComputeTiles(zoom, maxTiles, out complete, cancellationToken))
+            {
+                return false;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            var snapshot = (TileId[])complete.Clone();
+            cancellationToken.ThrowIfCancellationRequested();
+            _tilesByZoom[zoom] = complete;
+            tiles = snapshot;
+            return true;
+        }
+        finally
+        {
+            if (lockTaken)
+            {
+                Monitor.Exit(_cacheLock);
+            }
+        }
+    }
+
+    private bool TryComputeTiles(int zoom, int maxTiles, out TileId[] tiles, CancellationToken cancellationToken)
+    {
+        for (var sourceZoom = zoom + 1; sourceZoom <= MaxZoom; sourceZoom++)
+        {
+            if (_tilesByZoom.TryGetValue(sourceZoom, out var source))
+            {
+                // Apply the limit to the requested zoom, not to intermediate parent levels.
+                return TileCoverAlgorithm.TryGetAncestorTiles(source, zoom, maxTiles, out tiles, cancellationToken);
+            }
+        }
+
+        return _geometry != null
+            ? TileCoverAlgorithm.TryGetTilesAtZoom(_geometry, zoom, maxTiles, out tiles, cancellationToken)
+            : _tileUnion!.TryGetTiles(zoom, maxTiles, out tiles, cancellationToken);
     }
 
     /// <summary>Gets the smallest mixed-zoom tile set between two zoom levels that covers this cover at <paramref name="maxZoom"/> resolution.</summary>

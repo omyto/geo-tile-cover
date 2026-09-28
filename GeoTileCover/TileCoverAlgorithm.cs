@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Threading;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.Geometries.Prepared;
 
@@ -8,80 +10,110 @@ internal static class TileCoverAlgorithm
 {
     public static TileId[] GetTilesAtZoom(Geometry geometry, int zoom)
     {
-        var result = new HashSet<TileId>();
-        CollectAtZoom(geometry, zoom, result);
-        return Sort(result);
+        TryGetTilesAtZoom(geometry, zoom, null, out var tiles);
+        return tiles;
+    }
+
+    public static bool TryGetTilesAtZoom(Geometry geometry, int zoom, int? maxTiles, out TileId[] tiles, CancellationToken cancellationToken = default)
+    {
+        tiles = Array.Empty<TileId>();
+        var result = new TileAccumulator(maxTiles, cancellationToken);
+        if (!CollectAtZoom(geometry, zoom, result))
+        {
+            return false;
+        }
+
+        tiles = result.ToArray();
+        return true;
     }
 
     public static TileId[] GetParentTiles(IEnumerable<TileId> tiles)
     {
-        var parents = new HashSet<TileId>();
+        var parents = new TileAccumulator();
         foreach (var tile in tiles)
         {
-            parents.Add(tile.Parent());
+            parents.TryAdd(tile.Parent());
         }
 
-        return Sort(parents);
+        return parents.ToArray();
     }
 
-    private static TileId[] Sort(HashSet<TileId> tiles)
+    public static bool TryGetAncestorTiles(IEnumerable<TileId> source, int zoom, int maxTiles, out TileId[] tiles, CancellationToken cancellationToken)
     {
-        var ordered = new List<TileId>(tiles);
-        ordered.Sort(TileIdComparer.Instance);
-        return ordered.ToArray();
+        tiles = Array.Empty<TileId>();
+        var result = new TileAccumulator(maxTiles, cancellationToken);
+        foreach (var tile in source)
+        {
+            var shift = tile.Z - zoom;
+            if (!result.TryAdd(new TileId(zoom, tile.X >> shift, tile.Y >> shift)))
+            {
+                return false;
+            }
+        }
+
+        tiles = result.ToArray();
+        return true;
     }
 
-    private static void CollectAtZoom(Geometry geometry, int zoom, HashSet<TileId> result)
+    private static bool CollectAtZoom(Geometry geometry, int zoom, TileAccumulator result)
     {
+        result.CheckCancellation();
         if (geometry is GeometryCollection collection)
         {
             for (var index = 0; index < collection.NumGeometries; index++)
             {
-                CollectAtZoom(collection.GetGeometryN(index), zoom, result);
+                if (!CollectAtZoom(collection.GetGeometryN(index), zoom, result))
+                {
+                    return false;
+                }
             }
 
-            return;
+            return true;
         }
 
         if (geometry.Dimension == Dimension.Point)
         {
             foreach (var coordinate in geometry.Coordinates)
             {
-                result.Add(TileMath.ToTile(coordinate.X, coordinate.Y, zoom));
+                if (!result.TryAdd(TileMath.ToTile(coordinate.X, coordinate.Y, zoom)))
+                {
+                    return false;
+                }
             }
 
-            return;
+            return true;
         }
 
         var prepared = PreparedGeometryFactory.Prepare(geometry);
-        Visit(new TileId(0, 0, 0), zoom, geometry, prepared, result);
+        return Visit(new TileId(0, 0, 0), zoom, geometry, prepared, result);
     }
 
-    private static void Visit(TileId tile, int targetZoom, Geometry source, IPreparedGeometry prepared, HashSet<TileId> result)
+    private static bool Visit(TileId tile, int targetZoom, Geometry source, IPreparedGeometry prepared, TileAccumulator result)
     {
+        result.CheckCancellation();
         var tileGeometry = source.Factory.ToGeometry(TileMath.ToEnvelope(tile));
         if (!prepared.Intersects(tileGeometry))
         {
-            return;
+            return true;
         }
 
         if (tile.Z == targetZoom)
         {
             if (IntersectsTileInterior(source, tileGeometry) || LineBoundaryBelongsToTile(source, tileGeometry, tile))
             {
-                result.Add(tile);
+                return result.TryAdd(tile);
             }
 
-            return;
+            return true;
         }
 
         var z = tile.Z + 1;
         var x = tile.X << 1;
         var y = tile.Y << 1;
-        Visit(new TileId(z, x, y), targetZoom, source, prepared, result);
-        Visit(new TileId(z, x + 1, y), targetZoom, source, prepared, result);
-        Visit(new TileId(z, x, y + 1), targetZoom, source, prepared, result);
-        Visit(new TileId(z, x + 1, y + 1), targetZoom, source, prepared, result);
+        return Visit(new TileId(z, x, y), targetZoom, source, prepared, result)
+            && Visit(new TileId(z, x + 1, y), targetZoom, source, prepared, result)
+            && Visit(new TileId(z, x, y + 1), targetZoom, source, prepared, result)
+            && Visit(new TileId(z, x + 1, y + 1), targetZoom, source, prepared, result);
     }
 
     private static bool IntersectsTileInterior(Geometry source, Geometry tileGeometry)

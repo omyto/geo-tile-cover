@@ -55,6 +55,21 @@ Tile inputs are treated as a union of complete tile areas. The constructor snaps
 
 `GetTiles` returns every tile covered by the source, ordered by zoom, then row (`y`), then column (`x`). For geometry sources, points on tile edges or corners belong to exactly one XYZ tile. A line on a vertical boundary belongs to the eastern tile, while a line on a horizontal boundary belongs to the southern tile. A polygon or line endpoint touching only a tile boundary does not include the neighboring tile. The geometry algorithm traverses the XYZ quadtree and prunes branches that do not intersect the geometry instead of enumerating every tile in its bounding box.
 
+`GetTiles` has no tile-count limit and computes the complete result before returning; applying LINQ `Take` does not limit that work. Use `TryGetTiles` to stop traversal when the number of distinct tiles exceeds a budget:
+
+```csharp
+if (cover.TryGetTiles(zoom: 12, maxTiles: 100_000, out var tiles))
+{
+    // tiles contains the complete cover, ordered by row then column.
+}
+else
+{
+    // The cover exceeds the limit; tiles is empty.
+}
+```
+
+`maxTiles` must be nonnegative; zero accepts only an empty cover. `TryGetTiles` accepts an optional `CancellationToken` and throws `OperationCanceledException` when canceled. The limit also applies to cached results. Only complete results are cached, and changing the returned array does not change the cache. Cancellation is cooperative between traversal steps and cache waits; it cannot interrupt an individual NetTopologySuite operation. A tile-count limit does not bound geometry complexity or total computation time.
+
 Use `GetMinimalTiles(minZoom, maxZoom)` to return the smallest mixed-zoom tile array that preserves the cover at `maxZoom` resolution. Complete groups of four sibling tiles are recursively replaced by their parent, stopping at `minZoom`.
 
 ```csharp

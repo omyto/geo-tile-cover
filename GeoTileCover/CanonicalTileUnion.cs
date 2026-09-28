@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace GeoTileCover;
 
@@ -20,25 +21,36 @@ internal sealed class CanonicalTileUnion
 
     public TileId[] GetTiles(int zoom)
     {
-        var result = new HashSet<TileId>();
+        TryGetTiles(zoom, null, out var tiles);
+        return tiles;
+    }
+
+    public bool TryGetTiles(int zoom, int? maxTiles, out TileId[] tiles, CancellationToken cancellationToken = default)
+    {
+        tiles = Array.Empty<TileId>();
+        var result = new TileAccumulator(maxTiles, cancellationToken);
         foreach (var tile in _tiles)
         {
             if (tile.Z < zoom)
             {
-                AddDescendants(tile, zoom, result);
+                if (!AddDescendants(tile, zoom, result))
+                {
+                    return false;
+                }
             }
-            else
+            else if (!result.TryAdd(GetAncestor(tile, zoom)))
             {
-                result.Add(GetAncestor(tile, zoom));
+                return false;
             }
         }
 
-        return Sort(result);
+        tiles = result.ToArray();
+        return true;
     }
 
     public TileId[] GetMinimalTiles(int minZoom, int maxZoom)
     {
-        var bounded = new HashSet<TileId>();
+        var bounded = new TileAccumulator();
         foreach (var tile in _tiles)
         {
             if (tile.Z < minZoom)
@@ -47,15 +59,15 @@ internal sealed class CanonicalTileUnion
             }
             else if (tile.Z > maxZoom)
             {
-                bounded.Add(GetAncestor(tile, maxZoom));
+                bounded.TryAdd(GetAncestor(tile, maxZoom));
             }
             else
             {
-                bounded.Add(tile);
+                bounded.TryAdd(tile);
             }
         }
 
-        return Normalize(bounded, minZoom, maxZoom);
+        return Normalize(bounded.Tiles, minZoom, maxZoom);
     }
 
     private static TileId[] Normalize(IEnumerable<TileId> tiles, int minZoom, int maxZoom)
@@ -80,21 +92,21 @@ internal sealed class CanonicalTileUnion
         return Sort(normalized);
     }
 
-    private static void AddDescendants(TileId tile, int targetZoom, HashSet<TileId> result)
+    private static bool AddDescendants(TileId tile, int targetZoom, TileAccumulator result)
     {
+        result.CheckCancellation();
         if (tile.Z == targetZoom)
         {
-            result.Add(tile);
-            return;
+            return result.TryAdd(tile);
         }
 
         var z = tile.Z + 1;
         var x = tile.X << 1;
         var y = tile.Y << 1;
-        AddDescendants(new TileId(z, x, y), targetZoom, result);
-        AddDescendants(new TileId(z, x + 1, y), targetZoom, result);
-        AddDescendants(new TileId(z, x, y + 1), targetZoom, result);
-        AddDescendants(new TileId(z, x + 1, y + 1), targetZoom, result);
+        return AddDescendants(new TileId(z, x, y), targetZoom, result)
+            && AddDescendants(new TileId(z, x + 1, y), targetZoom, result)
+            && AddDescendants(new TileId(z, x, y + 1), targetZoom, result)
+            && AddDescendants(new TileId(z, x + 1, y + 1), targetZoom, result);
     }
 
     private static TileId GetAncestor(TileId tile, int targetZoom)
