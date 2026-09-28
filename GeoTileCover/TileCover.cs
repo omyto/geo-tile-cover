@@ -16,6 +16,7 @@ public sealed class TileCover
 
     private readonly object _cacheLock = new object();
     private readonly Dictionary<int, TileId[]> _tilesByZoom = new Dictionary<int, TileId[]>();
+    private readonly Dictionary<(int MinZoom, int MaxZoom), TileId[]> _minimalTilesByRange = new Dictionary<(int MinZoom, int MaxZoom), TileId[]>();
     private readonly CanonicalTileUnion? _tileUnion;
     private readonly Geometry? _geometry;
 
@@ -149,7 +150,7 @@ public sealed class TileCover
     }
 
     /// <summary>Gets the smallest mixed-zoom tile set between two zoom levels that covers this cover at <paramref name="maxZoom"/> resolution.</summary>
-    /// <remarks>Complete sibling groups are recursively replaced by their parent, stopping at <paramref name="minZoom"/>.</remarks>
+    /// <remarks>Complete sibling groups are recursively replaced by their parent, stopping at <paramref name="minZoom"/>. Geometry traversal retains fully covered branches without enumerating their maxZoom descendants. Geometry results are cached by both zoom bounds; the returned array is independent of the cache.</remarks>
     /// <exception cref="ArgumentOutOfRangeException">A zoom is outside the supported range or <paramref name="maxZoom"/> is less than <paramref name="minZoom"/>.</exception>
     public TileId[] GetMinimalTiles(int minZoom, int maxZoom)
     {
@@ -159,14 +160,20 @@ public sealed class TileCover
             return _tileUnion.GetMinimalTiles(minZoom, maxZoom);
         }
 
-        TileId[] tilesAtMaxZoom;
         lock (_cacheLock)
         {
-            EnsureCached(maxZoom, maxZoom);
-            tilesAtMaxZoom = _tilesByZoom[maxZoom];
-        }
+            var range = (minZoom, maxZoom);
+            if (!_minimalTilesByRange.TryGetValue(range, out var minimal))
+            {
+                // Reuse an existing full result, but never expand to maxZoom just to compact it.
+                minimal = _tilesByZoom.TryGetValue(maxZoom, out var full)
+                    ? new CanonicalTileUnion(full).GetMinimalTiles(minZoom, maxZoom)
+                    : TileCoverAlgorithm.GetMinimalTiles(_geometry!, minZoom, maxZoom);
+                _minimalTilesByRange[range] = minimal;
+            }
 
-        return new CanonicalTileUnion(tilesAtMaxZoom).GetMinimalTiles(minZoom, maxZoom);
+            return (TileId[])minimal.Clone();
+        }
     }
 
     private void EnsureCached(int minZoom, int maxZoom)

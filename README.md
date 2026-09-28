@@ -72,6 +72,8 @@ else
 
 Use `GetMinimalTiles(minZoom, maxZoom)` to return the smallest mixed-zoom tile array that preserves the cover at `maxZoom` resolution. Complete groups of four sibling tiles are recursively replaced by their parent, stopping at `minZoom`.
 
+For geometry inputs, fully covered quadtree branches are retained without expanding to `maxZoom`; boundary-only polygon neighbors are pruned, and complete sibling branches are merged during traversal. Covered regions below `minZoom` expand only to `minZoom`. Geometry results are cached separately by `(minZoom, maxZoom)` and returned as independent arrays. An existing full tile cache may be reused, but requesting a minimal cover does not generate a full `maxZoom` cache. Complex boundaries or a large minimal result can still require substantial work.
+
 ```csharp
 TileId[] minimalTiles = cover.GetMinimalTiles(minZoom: 10, maxZoom: 12);
 ```

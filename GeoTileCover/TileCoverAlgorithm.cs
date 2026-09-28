@@ -55,6 +55,84 @@ internal static class TileCoverAlgorithm
         return true;
     }
 
+    public static TileId[] GetMinimalTiles(Geometry geometry, int minZoom, int maxZoom)
+    {
+        var tree = new MinimalTileTree();
+        CollectMinimal(geometry, maxZoom, tree);
+        return tree.ToArray(minZoom);
+    }
+
+    private static void CollectMinimal(Geometry geometry, int maxZoom, MinimalTileTree tree)
+    {
+        if (geometry.IsEmpty || tree.Root.IsFull)
+        {
+            return;
+        }
+
+        if (geometry is GeometryCollection collection)
+        {
+            for (var index = 0; index < collection.NumGeometries; index++)
+            {
+                CollectMinimal(collection.GetGeometryN(index), maxZoom, tree);
+            }
+
+            return;
+        }
+
+        if (geometry.Dimension == Dimension.Point)
+        {
+            foreach (var coordinate in geometry.Coordinates)
+            {
+                tree.Add(TileMath.ToTile(coordinate.X, coordinate.Y, maxZoom));
+            }
+
+            return;
+        }
+
+        VisitMinimal(new TileId(0, 0, 0), tree.Root, maxZoom, geometry, PreparedGeometryFactory.Prepare(geometry));
+    }
+
+    private static void VisitMinimal(TileId tile, MinimalTileTree.Node node, int maxZoom, Geometry source, IPreparedGeometry prepared)
+    {
+        if (node.IsFull)
+        {
+            return;
+        }
+
+        var tileGeometry = source.Factory.ToGeometry(TileMath.ToEnvelope(tile));
+        if (!prepared.Intersects(tileGeometry))
+        {
+            return;
+        }
+
+        if (source is Polygon && prepared.Covers(tileGeometry))
+        {
+            node.Fill();
+            return;
+        }
+
+        // Prune boundary-only neighbors at every depth, while preserving line ownership.
+        if (!IntersectsTileInterior(source, tileGeometry) && !LineBoundaryBelongsToTile(source, tileGeometry, tile))
+        {
+            return;
+        }
+
+        if (tile.Z == maxZoom)
+        {
+            node.Fill();
+            return;
+        }
+
+        for (var quadrant = 0; quadrant < 4; quadrant++)
+        {
+            VisitMinimal(MinimalTileTree.ChildTile(tile, quadrant), node.GetOrCreateChild(quadrant), maxZoom, source, prepared);
+        }
+
+        // Full here means full coverage at maxZoom, including coverage accumulated
+        // from other components. It does not imply that the geometry fills the area.
+        node.Compact();
+    }
+
     private static bool CollectAtZoom(Geometry geometry, int zoom, TileAccumulator result)
     {
         result.CheckCancellation();
