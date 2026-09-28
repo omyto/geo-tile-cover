@@ -1,0 +1,25 @@
+@host = http://localhost:5000
+
+# @name createCover
+POST {{host}}/covers?includeBounds=true
+Content-Type: application/json
+
+{
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [105.8, 21.0],
+        [105.9, 21.0],
+        [105.9, 21.1],
+        [105.8, 21.1],
+        [105.8, 21.0]
+      ]
+    ]
+  },
+  "zoom": 12
+}
+
+### Reuse coverId from the createCover response.
+
+GET {{host}}/covers/{{createCover.response.body.$.coverId}}/tiles?zoom=14&includeBounds=true
