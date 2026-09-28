@@ -96,10 +96,11 @@ internal static class TileCoverAlgorithm
             return false;
         }
 
-        return LineIntersectionBelongsToTile(source.Intersection(tileGeometry), tile);
+        var lastIndex = TileMath.TilesPerAxis(tile.Z) - 1;
+        return LineIntersectionBelongsToTile(source.Intersection(tileGeometry), tileGeometry.EnvelopeInternal, tile.X == lastIndex, tile.Y == lastIndex);
     }
 
-    private static bool LineIntersectionBelongsToTile(Geometry intersection, TileId tile)
+    private static bool LineIntersectionBelongsToTile(Geometry intersection, Envelope bounds, bool ownsEastEdge, bool ownsSouthEdge)
     {
         if (intersection.IsEmpty)
         {
@@ -110,7 +111,7 @@ internal static class TileCoverAlgorithm
         {
             for (var index = 0; index < collection.NumGeometries; index++)
             {
-                if (LineIntersectionBelongsToTile(collection.GetGeometryN(index), tile))
+                if (LineIntersectionBelongsToTile(collection.GetGeometryN(index), bounds, ownsEastEdge, ownsSouthEdge))
                 {
                     return true;
                 }
@@ -119,12 +120,33 @@ internal static class TileCoverAlgorithm
             return false;
         }
 
-        if (intersection.Dimension != Dimension.Curve)
+        if (!(intersection is LineString line))
         {
             return false;
         }
 
-        var coordinate = intersection.InteriorPoint.Coordinate;
-        return coordinate != null && TileMath.ToTile(coordinate.X, coordinate.Y, tile.Z) == tile;
+        // InteriorPoint may return an endpoint. Classify positive-length boundary segments
+        // directly so ownership is independent of line direction and projection rounding.
+        var sequence = line.CoordinateSequence;
+        for (var index = 1; index < sequence.Count; index++)
+        {
+            var x0 = sequence.GetX(index - 1);
+            var y0 = sequence.GetY(index - 1);
+            var x1 = sequence.GetX(index);
+            var y1 = sequence.GetY(index);
+
+            // West/north edges belong to this tile; the outer world edges have no neighbor.
+            if (x0 == x1 && y0 != y1 && (x0 == bounds.MinX || (ownsEastEdge && x0 == bounds.MaxX)))
+            {
+                return true;
+            }
+
+            if (y0 == y1 && x0 != x1 && (y0 == bounds.MaxY || (ownsSouthEdge && y0 == bounds.MinY)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
