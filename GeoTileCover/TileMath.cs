@@ -28,8 +28,22 @@ internal static class TileMath
         var latitudeRadians = boundedLatitude * Math.PI / 180d;
         var mercatorY = Math.Log(Math.Tan(latitudeRadians) + 1d / Math.Cos(latitudeRadians)) / Math.PI;
         var y = (int)Math.Floor((1d - mercatorY) / 2d * tilesPerAxis);
+        y = Math.Min(tilesPerAxis - 1, Math.Max(0, y));
 
-        return new TileId(zoom, Math.Min(tilesPerAxis - 1, Math.Max(0, x)), Math.Min(tilesPerAxis - 1, Math.Max(0, y)));
+        // Projection rounding can put a boundary point in an adjacent row. Use the
+        // same latitude bounds as ToEnvelope, without snapping nearby points to an edge.
+        while (y > 0 && boundedLatitude > TileYToLatitude(y, tilesPerAxis))
+        {
+            y--;
+        }
+
+        // Internal south edges belong to the next row; the world's last row is closed.
+        while (y < tilesPerAxis - 1 && boundedLatitude <= TileYToLatitude(y + 1d, tilesPerAxis))
+        {
+            y++;
+        }
+
+        return new TileId(zoom, Math.Min(tilesPerAxis - 1, Math.Max(0, x)), y);
     }
 
     public static Envelope ToEnvelope(TileId tile)
