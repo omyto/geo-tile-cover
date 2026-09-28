@@ -5,6 +5,7 @@ namespace GeoTileCover.AspNetCoreDemo;
 internal static class CoverOptions
 {
     public const int MaxTilesPerResponse = 100_000;
+    public static readonly TimeSpan ComputationTimeout = TimeSpan.FromSeconds(10);
     public static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(15);
 }
 

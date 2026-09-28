@@ -15,10 +15,11 @@ internal static class TileResponseFactory
 {
     public static bool IsValidZoom(int zoom) => zoom >= TileCover.MinZoom && zoom <= TileCover.MaxZoom;
 
-    public static TilesResult CreateTiles(TileCover cover, int zoom, bool includeBounds)
+    public static TilesResult CreateTiles(TileCover cover, int zoom, bool includeBounds, CancellationToken cancellationToken)
     {
-        var tiles = cover.GetTiles(zoom).Take(CoverOptions.MaxTilesPerResponse + 1).ToArray();
-        if (tiles.Length > CoverOptions.MaxTilesPerResponse)
+        using var computation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        computation.CancelAfter(CoverOptions.ComputationTimeout);
+        if (!cover.TryGetTiles(zoom, CoverOptions.MaxTilesPerResponse, out var tiles, computation.Token))
         {
             return new TilesResult([], true);
         }
@@ -36,6 +37,11 @@ internal static class TileResponseFactory
         var envelope = tile.ToEnvelope();
         return new TileResponse(tile.Id, tile.Z, tile.X, tile.Y, [envelope.MinX, envelope.MinY, envelope.MaxX, envelope.MaxY]);
     }
+
+    public static IResult ComputationTimedOut() => Results.Problem(
+        title: "Tile cover computation timed out",
+        detail: "Try a smaller geometry or a lower zoom level.",
+        statusCode: StatusCodes.Status503ServiceUnavailable);
 
     public static IResult TooManyTiles() => Results.Problem(
         title: "Tile cover is too large",

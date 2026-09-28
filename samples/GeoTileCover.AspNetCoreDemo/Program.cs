@@ -12,7 +12,7 @@ builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.C
 
 var app = builder.Build();
 
-app.MapPost("/covers", (CreateCoverRequest request, CoverStore store, bool? includeBounds) =>
+app.MapPost("/covers", (CreateCoverRequest request, CoverStore store, bool? includeBounds, CancellationToken cancellationToken) =>
 {
     if (!TileResponseFactory.IsValidZoom(request.Zoom))
     {
@@ -33,7 +33,7 @@ app.MapPost("/covers", (CreateCoverRequest request, CoverStore store, bool? incl
     try
     {
         var cover = new TileCover(request.Geometry);
-        var tilesResult = TileResponseFactory.CreateTiles(cover, request.Zoom, includeBounds == true);
+        var tilesResult = TileResponseFactory.CreateTiles(cover, request.Zoom, includeBounds == true, cancellationToken);
         if (tilesResult.IsTooLarge)
         {
             return TileResponseFactory.TooManyTiles();
@@ -41,6 +41,10 @@ app.MapPost("/covers", (CreateCoverRequest request, CoverStore store, bool? incl
 
         var cachedCover = store.Create(cover);
         return Results.Ok(new CoverResponse(cachedCover.Id, request.Zoom, cachedCover.ExpiresAt, tilesResult.Tiles));
+    }
+    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+    {
+        return TileResponseFactory.ComputationTimedOut();
     }
     catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
     {
@@ -51,7 +55,7 @@ app.MapPost("/covers", (CreateCoverRequest request, CoverStore store, bool? incl
     }
 });
 
-app.MapGet("/covers/{coverId}/tiles", (Guid coverId, int zoom, CoverStore store, bool? includeBounds) =>
+app.MapGet("/covers/{coverId}/tiles", (Guid coverId, int zoom, CoverStore store, bool? includeBounds, CancellationToken cancellationToken) =>
 {
     if (!TileResponseFactory.IsValidZoom(zoom))
     {
@@ -71,13 +75,20 @@ app.MapGet("/covers/{coverId}/tiles", (Guid coverId, int zoom, CoverStore store,
         });
     }
 
-    var tilesResult = TileResponseFactory.CreateTiles(cachedCover.Cover, zoom, includeBounds == true);
-    if (tilesResult.IsTooLarge)
+    try
     {
-        return TileResponseFactory.TooManyTiles();
-    }
+        var tilesResult = TileResponseFactory.CreateTiles(cachedCover.Cover, zoom, includeBounds == true, cancellationToken);
+        if (tilesResult.IsTooLarge)
+        {
+            return TileResponseFactory.TooManyTiles();
+        }
 
-    return Results.Ok(new CoverResponse(cachedCover.Id, zoom, cachedCover.ExpiresAt, tilesResult.Tiles));
+        return Results.Ok(new CoverResponse(cachedCover.Id, zoom, cachedCover.ExpiresAt, tilesResult.Tiles));
+    }
+    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+    {
+        return TileResponseFactory.ComputationTimedOut();
+    }
 });
 
 app.Run();
