@@ -162,6 +162,72 @@ public sealed class TileIdTests
         Assert.Equal(85.0511287798066d, envelope.MaxY, precision: 12);
     }
 
+    [Theory]
+    [InlineData(0, 0, 0)]
+    [InlineData(8, 201, 114)]
+    [InlineData(16, 32768, 0)]
+    [InlineData(16, 65535, 65535)]
+    [InlineData(25, 33554431, 33554431)]
+    public void Equal_tiles_from_supported_encodings_have_equal_hashes(int zoom, int x, int y)
+    {
+        var tile = new TileId(zoom, x, y);
+        var restored = new TileId(tile.Id);
+        var dictionary = new Dictionary<TileId, string> { [tile] = "tile" };
+        Assert.Equal(tile.GetHashCode(), restored.GetHashCode());
+        Assert.Equal("tile", dictionary[restored]);
+        if (tile.TryGetPackedXY(out var packedXY))
+        {
+            var fromPackedXY = new TileId(zoom, packedXY);
+            Assert.Equal(tile.GetHashCode(), fromPackedXY.GetHashCode());
+            Assert.Equal("tile", dictionary[fromPackedXY]);
+        }
+
+        if (zoom == 0)
+        {
+            Assert.Equal(tile.GetHashCode(), default(TileId).GetHashCode());
+            Assert.Equal("tile", dictionary[default]);
+        }
+    }
+
+    [Theory]
+    [InlineData(128, 1)]
+    [InlineData(1, 0)]
+    [InlineData(0, 1)]
+    [InlineData(1, 1)]
+    public void Structured_coordinate_sequences_have_well_distributed_hashes(int xStep, int yStep)
+    {
+        const int count = 20_000;
+        var hashes = new HashSet<int>();
+        for (var index = 0; index < count; index++)
+        {
+            hashes.Add(new TileId(25, index * xStep, index * yStep).GetHashCode());
+        }
+
+        // Allow normal 32-bit collisions without accepting systematic clustering.
+        // In particular, the old long hash collapses (128 * i, i) to one value.
+        Assert.True(hashes.Count >= count * 99 / 100, $"Only {hashes.Count} distinct hashes for {count} tiles.");
+    }
+
+    [Theory]
+    [InlineData(8)]
+    [InlineData(16)]
+    [InlineData(25)]
+    public void Rectangular_tile_grids_have_well_distributed_hashes(int zoom)
+    {
+        const int side = 256;
+        var hashes = new HashSet<int>();
+        for (var y = 0; y < side; y++)
+        {
+            for (var x = 0; x < side; x++)
+            {
+                hashes.Add(new TileId(zoom, x, y).GetHashCode());
+            }
+        }
+
+        const int count = side * side;
+        Assert.True(hashes.Count >= count * 99 / 100, $"Only {hashes.Count} distinct hashes for {count} tiles.");
+    }
+
     [Fact]
     public void Value_equality_supports_hash_based_deduplication()
     {

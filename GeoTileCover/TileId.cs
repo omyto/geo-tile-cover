@@ -146,7 +146,21 @@ public readonly struct TileId : IEquatable<TileId>
     public override bool Equals(object? obj) => obj is TileId other && Equals(other);
 
     /// <inheritdoc/>
-    public override int GetHashCode() => Id.GetHashCode();
+    public override int GetHashCode()
+    {
+        // MurmurHash3 fmix64 mixes the packed fields before reducing to 32 bits.
+        // https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
+        unchecked
+        {
+            var hash = (ulong)Id;
+            hash ^= hash >> 33;
+            hash *= 0xff51afd7ed558ccdUL;
+            hash ^= hash >> 33;
+            hash *= 0xc4ceb9fe1a85ec53UL;
+            hash ^= hash >> 33;
+            return (int)hash;
+        }
+    }
 
     /// <summary>Returns the tile coordinate formatted as <c>z/x/y</c>.</summary>
     public override string ToString() => $"{Z}/{X}/{Y}";
