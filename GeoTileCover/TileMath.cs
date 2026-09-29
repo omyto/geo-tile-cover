@@ -25,6 +25,21 @@ internal static class TileMath
         var boundedLongitude = Math.Max(-180d, Math.Min(180d, longitude));
         var boundedLatitude = Math.Max(-WebMercatorLatitudeLimit, Math.Min(WebMercatorLatitudeLimit, latitude));
         var x = (int)Math.Floor((boundedLongitude + 180d) / 360d * tilesPerAxis);
+        x = Math.Min(tilesPerAxis - 1, Math.Max(0, x));
+
+        // Adding 180 can round a longitude across a column boundary. Compare with
+        // the same bounds as ToEnvelope to preserve even points one double apart.
+        while (x > 0 && boundedLongitude < TileXToLongitude(x, tilesPerAxis))
+        {
+            x--;
+        }
+
+        // Internal east edges belong to the next column; +180 stays in the last column.
+        while (x < tilesPerAxis - 1 && boundedLongitude >= TileXToLongitude(x + 1d, tilesPerAxis))
+        {
+            x++;
+        }
+
         var latitudeRadians = boundedLatitude * Math.PI / 180d;
         var mercatorY = Math.Log(Math.Tan(latitudeRadians) + 1d / Math.Cos(latitudeRadians)) / Math.PI;
         var y = (int)Math.Floor((1d - mercatorY) / 2d * tilesPerAxis);
@@ -43,18 +58,20 @@ internal static class TileMath
             y++;
         }
 
-        return new TileId(zoom, Math.Min(tilesPerAxis - 1, Math.Max(0, x)), y);
+        return new TileId(zoom, x, y);
     }
 
     public static Envelope ToEnvelope(TileId tile)
     {
         var tilesPerAxis = TilesPerAxis(tile.Z);
-        var west = tile.X / (double)tilesPerAxis * 360d - 180d;
-        var east = (tile.X + 1d) / tilesPerAxis * 360d - 180d;
+        var west = TileXToLongitude(tile.X, tilesPerAxis);
+        var east = TileXToLongitude(tile.X + 1d, tilesPerAxis);
         var north = TileYToLatitude(tile.Y, tilesPerAxis);
         var south = TileYToLatitude(tile.Y + 1d, tilesPerAxis);
         return new Envelope(west, east, south, north);
     }
+
+    private static double TileXToLongitude(double x, int tilesPerAxis) => x / tilesPerAxis * 360d - 180d;
 
     private static double TileYToLatitude(double y, int tilesPerAxis)
     {

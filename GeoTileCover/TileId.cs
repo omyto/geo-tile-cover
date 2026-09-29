@@ -34,7 +34,7 @@ public readonly struct TileId : IEquatable<TileId>
     }
 
     /// <summary>Creates a tile from its zoom level and opaque 32-bit packed X/Y representation.</summary>
-    /// <param name="z">Zoom level from <see cref="TileCover.MinZoom"/> through <see cref="TileCover.MaxZoom"/>.</param>
+    /// <param name="z">Zoom level from 0 through 16.</param>
     /// <param name="packedXY">X and Y packed into <c>2 * z</c> bits. The value may be negative at zoom 16.</param>
     public TileId(int z, int packedXY)
     {
@@ -46,17 +46,18 @@ public readonly struct TileId : IEquatable<TileId>
 
         var bits = unchecked((uint)packedXY);
         var coordinateMask = (1u << z) - 1;
-        var x = (int)(bits >> z);
-        var y = (int)(bits & coordinateMask);
+        var x = bits >> z;
+        var y = bits & coordinateMask;
 
-        if (x >= tilesPerAxis || y >= tilesPerAxis)
+        // Validate before narrowing: at zoom 0, a negative packed value still has its sign bit set.
+        if (x >= (uint)tilesPerAxis || y >= (uint)tilesPerAxis)
         {
             throw new ArgumentOutOfRangeException(nameof(packedXY), "Packed XY contains coordinates outside the encoded zoom grid.");
         }
 
         Z = z;
-        X = x;
-        Y = y;
+        X = (int)x;
+        Y = (int)y;
     }
 
     /// <summary>Creates a tile from its packed numeric ID.</summary>

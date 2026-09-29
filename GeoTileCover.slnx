@@ -1,4 +1,7 @@
 <Solution>
   <Project Path="GeoTileCover/GeoTileCover.csproj" />
+  <Folder Name="/samples/">
+    <Project Path="samples/GeoTileCover.AspNetCoreDemo/GeoTileCover.AspNetCoreDemo.csproj" />
+  </Folder>
   <Project Path="GeoTileCover.Tests/GeoTileCover.Tests.csproj" />
 </Solution>

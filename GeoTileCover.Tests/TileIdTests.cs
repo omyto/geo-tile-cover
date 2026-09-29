@@ -113,6 +113,32 @@ public sealed class TileIdTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new TileId(z, packedXY));
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(int.MinValue)]
+    [InlineData(-12345)]
+    public void Negative_packed_xy_is_rejected_below_zoom_16(int packedXY)
+    {
+        for (var zoom = 0; zoom < 16; zoom++)
+        {
+            var exception = Assert.Throws<ArgumentOutOfRangeException>(() => new TileId(zoom, packedXY));
+            Assert.Equal("packedXY", exception.ParamName);
+        }
+    }
+
+    [Theory]
+    [InlineData(int.MinValue, 32768, 0)]
+    [InlineData(int.MinValue + 1, 32768, 1)]
+    [InlineData(-65536, 65535, 0)]
+    [InlineData(-1, 65535, 65535)]
+    public void Negative_packed_xy_round_trips_at_zoom_16(int packedXY, int x, int y)
+    {
+        var tile = new TileId(16, packedXY);
+        Assert.Equal(new TileId(16, x, y), tile);
+        Assert.Equal(packedXY, tile.PackedXY);
+        Assert.Equal(tile, new TileId(tile.Id));
+    }
+
     [Fact]
     public void Parent_uses_xyz_quadtree_coordinates()
     {
