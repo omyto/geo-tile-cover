@@ -2,6 +2,7 @@ using GeoTileCover;
 using GeoTileCover.AspNetCoreDemo;
 using Microsoft.AspNetCore.Mvc;
 using NetTopologySuite.IO.Converters;
+using NetTopologySuite.Operation.Valid;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +33,17 @@ app.MapPost("/covers", (CreateCoverRequest request, CoverStore store, bool? incl
 
     try
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        var validationError = new IsValidOp(request.Geometry).ValidationError;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (validationError is not null)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(request.Geometry)] = [$"Invalid geometry: {validationError}"]
+            });
+        }
+
         var cover = new TileCover(request.Geometry);
         var tilesResult = TileResponseFactory.CreateTiles(cover, request.Zoom, includeBounds == true, cancellationToken);
         if (tilesResult.IsTooLarge)
