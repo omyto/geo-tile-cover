@@ -25,7 +25,7 @@ Content-Type: application/json
 }
 ```
 
-The response contains `coverId`, `expiresAt`, and the tiles for the requested zoom. Reuse the cover at another zoom with:
+The response contains `coverId`, `expiresAt`, and the tiles for the requested zoom. Each tile contains `z`, `x`, and `y`, plus optional `bounds` when `includeBounds=true`. These coordinates uniquely identify the tile; a packed numeric tile ID is not included. Reuse the cover at another zoom with:
 
 ```http
 GET /covers/{coverId}/tiles?zoom=14&includeBounds=true

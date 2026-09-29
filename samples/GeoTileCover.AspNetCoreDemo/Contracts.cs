@@ -7,7 +7,7 @@ internal sealed record CreateCoverRequest(Geometry? Geometry, int Zoom);
 
 internal sealed record CoverResponse(Guid CoverId, int Zoom, DateTimeOffset ExpiresAt, TileResponse[] Tiles);
 
-internal sealed record TileResponse(long Id, int Z, int X, int Y, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] double[]? Bounds);
+internal sealed record TileResponse(int Z, int X, int Y, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] double[]? Bounds);
 
 internal readonly record struct TilesResult(TileResponse[] Tiles, bool IsTooLarge);
 
@@ -31,11 +31,11 @@ internal static class TileResponseFactory
     {
         if (!includeBounds)
         {
-            return new TileResponse(tile.Id, tile.Z, tile.X, tile.Y, null);
+            return new TileResponse(tile.Z, tile.X, tile.Y, null);
         }
 
         var envelope = tile.ToEnvelope();
-        return new TileResponse(tile.Id, tile.Z, tile.X, tile.Y, [envelope.MinX, envelope.MinY, envelope.MaxX, envelope.MaxY]);
+        return new TileResponse(tile.Z, tile.X, tile.Y, [envelope.MinX, envelope.MinY, envelope.MaxX, envelope.MaxY]);
     }
 
     public static IResult ComputationTimedOut() => Results.Problem(
