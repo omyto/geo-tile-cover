@@ -1,96 +1,121 @@
 # GeoTileCover
 
-Small .NET library for listing Web Mercator **XYZ tiles** intersecting a geometry or represented by a full-tile union.
+Find the Web Mercator **XYZ tiles** covered by a [NetTopologySuite](https://github.com/NetTopologySuite/NetTopologySuite) geometry or a set of existing tiles. Supports points, lines, polygons, multi-geometries, and geometry collections at zooms **0–25**.
 
-The library targets `netstandard2.0`, so it can be consumed by .NET Framework 4.7.2+, .NET Core, and current .NET applications.
+## Installation
 
-## Install
-
-```bash
-dotnet add package GeoTileCover --version 0.1.0-preview.2
+```shell
+dotnet add package GeoTileCover
 ```
 
-## Usage
+## Quick start
 
-Input geometries use WGS84 coordinate order: **X = longitude, Y = latitude**.
-
-Longitude must be within **-180–180°** and latitude within the Web Mercator limit of **±85.0511287798066°**. Out-of-range coordinates are rejected. Geometry segments that cross the antimeridian are also rejected and must be split before calling the library.
-
-Supported zoom levels are exposed as `TileCover.MinZoom` and `TileCover.MaxZoom`; the current inclusive range is **0–25**.
+Use WGS84 coordinates in **longitude, latitude** order.
 
 ```csharp
+using System;
+using System.Threading;
 using GeoTileCover;
 using NetTopologySuite.Geometries;
 
 var geometry = new GeometryFactory().CreatePoint(new Coordinate(105.8342, 21.0278));
 var cover = new TileCover(geometry);
-foreach (var tile in cover.GetTiles(minZoom: 10, maxZoom: 12))
+
+foreach (var tile in cover.GetTiles(10))
 {
-    Console.WriteLine(tile); // z/x/y, e.g. 10/813/450
-    Console.WriteLine(tile.Id); // stable, collision-free 64-bit numeric ID
+    Console.WriteLine(tile); // 10/813/450
 }
 ```
 
-`TileId.Id` packs Z, X, and Y into a `long`. It can be restored with `new TileId(id)`.
+Each `TileId` has `Z` (zoom), `X` (column, increasing eastward), and `Y` (row, increasing southward). The examples below reuse `cover`.
 
-`TileId.PackedXY` packs X and Y into an opaque `int` for zoom levels 0 through 16. It is unique within the tile's zoom level and can be restored together with Z using `new TileId(z, packedXY)`. The packed value uses all 32 bits and may therefore be negative at zoom 16. Use `TryGetPackedXY` when a tile may be above zoom 16.
+A `TileCover` snapshots its input. Later changes to the source geometry or tile collection have no effect. Reuse the instance to benefit from cached results.
 
-`TileId.ToEnvelope()` returns the tile's WGS84 geographic bounds as a NetTopologySuite `Envelope`, with X as longitude and Y as latitude.
+## Methods
 
-`TileCover` takes a snapshot of the input geometry. Tile results are computed lazily and cached by zoom on the instance, so repeated and overlapping `GetTiles` calls reuse prior work.
+| Method | Result |
+|---|---|
+| `GetTiles(zoom)` | All covered tiles at one zoom. |
+| `GetTiles(minZoom, maxZoom)` | Covered tiles at every zoom in the inclusive range. |
+| `TryGetTiles(zoom, maxTiles, out tiles, cancellationToken)` | Complete coverage at one zoom if it fits the limit; the cancellation token is optional. |
+| `GetMinimalTiles(minZoom, maxZoom)` | The smallest mixed-zoom set preserving coverage at `maxZoom`. |
 
-A cover can also be restored from fully covered tiles, including tiles at different zoom levels:
+Results are deduplicated and ordered by `Z`, then `Y`, then `X`. Zoom ranges must satisfy `TileCover.MinZoom <= minZoom <= maxZoom <= TileCover.MaxZoom` (currently 0–25). Returned arrays can be modified without affecting later results.
 
-```csharp
-var restored = new TileCover(new[]
-{
-    new TileId(10, 813, 450),
-    new TileId(12, 3257, 1802)
-});
+`GetTiles` computes the complete result before returning and has no tile-count limit. LINQ `Take()` does not limit that work; use `TryGetTiles` for large or unpredictable inputs.
 
-var zoom11Tiles = restored.GetTiles(11);
-```
-
-Tile inputs are treated as a union of complete tile areas. The constructor snapshots and compacts the union without expanding everything to the highest source zoom. Descendants are generated only when a higher zoom is requested, while lower zooms are derived through parent tiles.
-
-`GetTiles` returns every tile covered by the source, ordered by zoom, then row (`y`), then column (`x`). For geometry sources, points on tile edges or corners belong to exactly one XYZ tile. A line on a vertical boundary belongs to the eastern tile, while a line on a horizontal boundary belongs to the southern tile. A polygon or line endpoint touching only a tile boundary does not include the neighboring tile. The geometry algorithm traverses the XYZ quadtree and prunes branches that do not intersect the geometry instead of enumerating every tile in its bounding box.
-
-`GetTiles` has no tile-count limit and computes the complete result before returning; applying LINQ `Take` does not limit that work. Use `TryGetTiles` to stop traversal when the number of distinct tiles exceeds a budget:
+### Bounded results
 
 ```csharp
-if (cover.TryGetTiles(zoom: 12, maxTiles: 100_000, out var tiles))
+using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+if (cover.TryGetTiles(12, maxTiles: 100_000, out var tiles, cancellationToken: cancellation.Token))
 {
-    // tiles contains the complete cover, ordered by row then column.
+    Console.WriteLine($"Covered tiles: {tiles.Length}");
 }
 else
 {
-    // The cover exceeds the limit; tiles is empty.
+    Console.WriteLine("The cover exceeds 100,000 tiles.");
 }
 ```
 
-`maxTiles` must be nonnegative; zero accepts only an empty cover. `TryGetTiles` accepts an optional `CancellationToken` and throws `OperationCanceledException` when canceled. The limit also applies to cached results. Only complete results are cached, and changing the returned array does not change the cache. Cancellation is cooperative between traversal steps and cache waits; it cannot interrupt an individual NetTopologySuite operation. A tile-count limit does not bound geometry complexity or total computation time.
+`true` returns the complete result; `false` returns an empty array when the limit is exceeded. `maxTiles` must be nonnegative; zero accepts only an empty cover. The limit also applies to cached results.
 
-Use `GetMinimalTiles(minZoom, maxZoom)` to return the smallest mixed-zoom tile array that preserves the cover at `maxZoom` resolution. Complete groups of four sibling tiles are recursively replaced by their parent, stopping at `minZoom`.
+Cancellation throws `OperationCanceledException`. It is cooperative and cannot interrupt an individual NetTopologySuite operation, so a deadline is not a hard timeout. The tile limit does not bound geometry complexity or total computation time.
 
-For geometry inputs, fully covered quadtree branches are retained without expanding to `maxZoom`; boundary-only polygon neighbors are pruned, and complete sibling branches are merged during traversal. Covered regions below `minZoom` expand only to `minZoom`. Geometry results are cached separately by `(minZoom, maxZoom)` and returned as independent arrays. An existing full tile cache may be reused, but requesting a minimal cover does not generate a full `maxZoom` cache. Complex boundaries or a large minimal result can still require substantial work.
+### Minimal cover
 
 ```csharp
-TileId[] minimalTiles = cover.GetMinimalTiles(minZoom: 10, maxZoom: 12);
+TileId[] minimal = cover.GetMinimalTiles(minZoom: 10, maxZoom: 12);
 ```
 
-## Layout
+Complete groups of four siblings are replaced by their parent, stopping at `minZoom`. For example, `2/0/0`, `2/1/0`, `2/0/1`, and `2/1/1` reduce to `1/0/0` if zoom 1 is allowed.
 
-```text
-GeoTileCover/        library and NuGet project
-GeoTileCover.Tests/  unit tests
+Expanding the result to `maxZoom` reproduces `GetTiles(maxZoom)`. This preserves coverage at that tile resolution; a single point remains a tile at `maxZoom`. This method has no tile-count limit or cancellation parameter.
+
+## Existing tiles
+
+Pass an `IEnumerable<TileId>` to cover the union of complete tile areas. Inputs may mix zoom levels, overlap, or repeat.
+
+```csharp
+var restored = new TileCover(new[] { new TileId(1, 0, 0), new TileId(2, 2, 0) });
+
+var zoom2Tiles = restored.GetTiles(2); // Four children of 1/0/0, plus 2/2/0: five tiles.
+var compactTiles = restored.GetMinimalTiles(0, 2); // 1/0/0 and 2/2/0.
 ```
 
-The repository root deliberately stays language-neutral; Java and Go implementations can be added later without renaming the repository.
+Finer zooms include all descendants of source tiles; coarser zooms include their ancestors.
 
-## Feedback
+## TileId
 
-Report bugs and propose features through [GitHub Issues](https://github.com/omyto/geo-tile-cover/issues).
+An immutable value type with equality based on `Z`, `X`, and `Y`, suitable for dictionary keys and sets.
 
-## License
+```csharp
+var tileId = new TileId(10, 813, 450);
 
-GeoTileCover is licensed under the [MIT License](LICENSE).
+string xyz = tileId.ToString();       // "10/813/450"
+TileId parent = tileId.Parent();      // 9/406/225
+Envelope bounds = tileId.ToEnvelope();
+long id = tileId.Id;
+TileId fromId = new TileId(id);       // Same tile.
+```
+
+`ToEnvelope()` returns bounds in degrees: `MinX`/`MaxX` are west/east longitudes and `MinY`/`MaxY` are south/north latitudes. `Parent()` throws `InvalidOperationException` at zoom 0.
+
+`Id` is a stable, unique 64-bit identifier across supported zooms. Use it for storage; `GetHashCode()` is for in-memory collections. For JSON clients without exact 64-bit integer support, send `Id` as a string or send `Z`, `X`, and `Y`.
+
+`PackedXY` stores X/Y in an `int` for zooms **0–16**. Keep the zoom alongside it and restore with `new TileId(z, packedXY)`. Negative values are valid at zoom 16. Above zoom 16, `TryGetPackedXY(out var packedXY)` returns `false`, while `PackedXY` throws `InvalidOperationException`.
+
+## Input rules
+
+- **Coordinates:** X = longitude, Y = latitude, in degrees. SRID must be `0` (interpreted as WGS84) or `4326`. Coordinates are not reprojected.
+- **Bounds:** coordinates must be finite; longitude within **−180° to 180°**, latitude within **±85.0511287798066°**. Out-of-range coordinates are rejected.
+- **Antimeridian:** split crossings first. Segments with a longitude change greater than 180° throw `NotSupportedException`.
+- **Topology:** the caller supplies valid geometry. The library does not validate or repair topology; geometry-operation exceptions may propagate. Use NetTopologySuite's `IsValid` or `IsValidOp` when validation is needed.
+- **Empty/null:** empty geometries and tile collections return no tiles; null inputs are rejected.
+
+### Boundaries
+
+- Points and lines on internal edges belong to the eastern or southern tile. A point at an internal corner belongs to the southeastern tile.
+- A polygon boundary or line endpoint merely touching a neighboring tile does not include it.
+- Outer world boundaries belong to the outermost tiles, including longitude `180°` and the southern latitude limit.
