@@ -4,4 +4,7 @@
     <Project Path="samples/GeoTileCover.AspNetCoreDemo/GeoTileCover.AspNetCoreDemo.csproj" />
   </Folder>
   <Project Path="GeoTileCover.Tests/GeoTileCover.Tests.csproj" />
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/GeoTileCover.Benchmarks/GeoTileCover.Benchmarks.csproj" />
+  </Folder>
 </Solution>
