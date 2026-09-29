@@ -6,7 +6,9 @@ namespace GeoTileCover;
 /// <summary>Identifies one Web Mercator XYZ tile.</summary>
 public readonly struct TileId : IEquatable<TileId>
 {
-    private const int PackedXYMaxZoom = 16;
+    /// <summary>The highest zoom level supported by the 32-bit packed X/Y representation.</summary>
+    public const int PackedXYMaxZoom = 16;
+
     private const int CoordinateBits = TileCover.MaxZoom;
     private const int ZoomShift = CoordinateBits * 2;
     private const long CoordinateMask = (1L << CoordinateBits) - 1;

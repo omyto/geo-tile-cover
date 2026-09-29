@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>GeoTileCover</PackageId>
-    <PackageVersion>0.1.0-preview.2</PackageVersion>
+    <PackageVersion>1.0.0</PackageVersion>
     <Authors>Omyto</Authors>
     <Description>Cover WGS84 geometries with Web Mercator XYZ tiles.</Description>
     <PackageTags>geospatial;tiles;xyz;web-mercator;tile-cover</PackageTags>

@@ -78,16 +78,16 @@ public sealed class TileIdTests
     [Fact]
     public void Packed_xy_uses_all_int_bits_at_zoom_16()
     {
-        var tile = new TileId(16, 65535, 65535);
+        var tile = new TileId(TileId.PackedXYMaxZoom, 65535, 65535);
 
         Assert.Equal(-1, tile.PackedXY);
-        Assert.Equal(tile, new TileId(16, -1));
+        Assert.Equal(tile, new TileId(TileId.PackedXYMaxZoom, -1));
     }
 
     [Fact]
     public void Try_get_packed_xy_returns_value_through_zoom_16()
     {
-        var tile = new TileId(16, 65535, 65535);
+        var tile = new TileId(TileId.PackedXYMaxZoom, 65535, 65535);
 
         Assert.True(tile.TryGetPackedXY(out var packedXY));
         Assert.Equal(-1, packedXY);
@@ -96,7 +96,7 @@ public sealed class TileIdTests
     [Fact]
     public void Packed_xy_is_unavailable_above_zoom_16()
     {
-        var tile = new TileId(17, 0, 0);
+        var tile = new TileId(TileId.PackedXYMaxZoom + 1, 0, 0);
 
         Assert.Throws<InvalidOperationException>(() => tile.PackedXY);
         Assert.False(tile.TryGetPackedXY(out var packedXY));

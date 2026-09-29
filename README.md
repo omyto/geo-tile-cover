@@ -93,18 +93,20 @@ An immutable value type with equality based on `Z`, `X`, and `Y`, suitable for d
 ```csharp
 var tileId = new TileId(10, 813, 450);
 
-string xyz = tileId.ToString();       // "10/813/450"
-TileId parent = tileId.Parent();      // 9/406/225
-Envelope bounds = tileId.ToEnvelope();
-long id = tileId.Id;
-TileId fromId = new TileId(id);       // Same tile.
+long id = tileId.Id;                   // Unique 64-bit ID including zoom.
+int packedXY = tileId.PackedXY;        // Unique within a zoom level.
+string xyz = tileId.ToString();        // "10/813/450"
+TileId parent = tileId.Parent();       // 9/406/225
+Envelope bounds = tileId.ToEnvelope(); // Geographic bounds in degrees.
+
+TileId fromId = new TileId(id);        // Same tile.
 ```
 
 `ToEnvelope()` returns bounds in degrees: `MinX`/`MaxX` are west/east longitudes and `MinY`/`MaxY` are south/north latitudes. `Parent()` throws `InvalidOperationException` at zoom 0.
 
 `Id` is a stable, unique 64-bit identifier across supported zooms. Use it for storage; `GetHashCode()` is for in-memory collections. For JSON clients without exact 64-bit integer support, send `Id` as a string or send `Z`, `X`, and `Y`.
 
-`PackedXY` stores X/Y in an `int` for zooms **0–16**. Keep the zoom alongside it and restore with `new TileId(z, packedXY)`. Negative values are valid at zoom 16. Above zoom 16, `TryGetPackedXY(out var packedXY)` returns `false`, while `PackedXY` throws `InvalidOperationException`.
+`PackedXY` stores X/Y in an `int` for zooms **0–16** (`TileId.PackedXYMaxZoom`). It is unique within a zoom level, but values can repeat across zooms. Store the pair `(z, packedXY)` and restore with `new TileId(z, packedXY)`. Negative values are valid at zoom 16. Above zoom 16, `TryGetPackedXY(out var packedXY)` returns `false`, while `PackedXY` throws `InvalidOperationException`.
 
 ## Input rules
 
