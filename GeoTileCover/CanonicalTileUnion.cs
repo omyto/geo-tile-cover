@@ -33,7 +33,7 @@ internal sealed class CanonicalTileUnion
         {
             if (tile.Z < zoom)
             {
-                if (!AddDescendants(tile, zoom, result))
+                if (!result.TryAddDescendants(tile, zoom))
                 {
                     return false;
                 }
@@ -55,7 +55,7 @@ internal sealed class CanonicalTileUnion
         {
             if (tile.Z < minZoom)
             {
-                AddDescendants(tile, minZoom, bounded);
+                bounded.TryAddDescendants(tile, minZoom);
             }
             else if (tile.Z > maxZoom)
             {
@@ -90,23 +90,6 @@ internal sealed class CanonicalTileUnion
         }
 
         return Sort(normalized);
-    }
-
-    private static bool AddDescendants(TileId tile, int targetZoom, TileAccumulator result)
-    {
-        result.CheckCancellation();
-        if (tile.Z == targetZoom)
-        {
-            return result.TryAdd(tile);
-        }
-
-        var z = tile.Z + 1;
-        var x = tile.X << 1;
-        var y = tile.Y << 1;
-        return AddDescendants(new TileId(z, x, y), targetZoom, result)
-            && AddDescendants(new TileId(z, x + 1, y), targetZoom, result)
-            && AddDescendants(new TileId(z, x, y + 1), targetZoom, result)
-            && AddDescendants(new TileId(z, x + 1, y + 1), targetZoom, result);
     }
 
     private static TileId GetAncestor(TileId tile, int targetZoom)

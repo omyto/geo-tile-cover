@@ -5,7 +5,7 @@ Remaining work reviewed against the source on 2026-10-01.
 ## Performance
 
 - [x] Add geometry coverage benchmarks for LineString, Polygon, and MultiPolygon at zooms 8, 16, and 25, measuring runtime and allocations for `GetTiles`, complete/rejected `TryGetTiles`, and `GetMinimalTiles`. Synthetic footprints scale with zoom to bound full output to 1,024 tiles; detailed inputs contain roughly 2,000 vertices. See the [benchmark guide](benchmarks/GeoTileCover.Benchmarks/README.md#geometry-coverage).
-- [ ] Evaluate a fully covered tile fast path for geometry-backed `GetTiles` and `TryGetTiles` against the benchmark baseline; implement only if measurements justify it. Preserve boundary ownership, deduplication, tile limits, and cancellation, and check for regressions on lines and rejected requests. `GetMinimalTiles` already short-circuits fully covered branches.
+- [x] Implement and benchmark the fully covered polygon fast path for geometry-backed `GetTiles` and `TryGetTiles`. Descendants use the shared accumulator to preserve deduplication, tile limits, and cancellation; budgets below 16 retain ordinary traversal. Added regression tests for coverage, holes, overlaps, high zooms, and geometry-operation counts. See the [before/after comparison and limitations](benchmarks/GeoTileCover.Benchmarks/COVERED-BRANCH-RESULTS.md).
 
 ## Packaging and releases
 

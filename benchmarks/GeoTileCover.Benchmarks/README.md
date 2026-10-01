@@ -36,6 +36,8 @@ A [recorded comparison](RESULTS.md) includes raw results and explains why the li
 
 The [2026-10-01 exploratory baseline](GEOMETRY-RESULTS.md) records all 48 cases, fixture output counts, and measurement limitations.
 
+The [covered polygon branch comparison](COVERED-BRANCH-RESULTS.md) measures the subsequent fast path against the original implementation with longer warmup, including line and rejected-request controls.
+
 Validate every fixture and exercise all four methods before measuring:
 
 ```shell
@@ -71,7 +73,7 @@ Each timed invocation creates a new `TileCover`, including its geometry snapshot
 - `TryGetTilesRejected` has an eight-tile budget and must return `false` with an empty array. It measures early termination, so its runtime is not a full-cover comparison.
 - `GetMinimalTiles` uses the range `0..Zoom`. It returns a different, compact representation, so its runtime and allocations are not a drop-in performance ratio against full enumeration.
 
-These measurements establish the current implementation's baseline. They do not implement or measure a proposed `Covers` fast path or a minimal-then-expand algorithm. Compare the same fixtures before and after any optimization, including line and rejected-request regressions. Short-run differences require longer repeated runs before making an implementation decision.
+Use the same fixtures before and after any optimization, including line and rejected-request controls. The initial baseline predates the `Covers` fast path; the linked comparison measures that change. Neither run measures a minimal-then-expand algorithm. Short-run differences require longer repeated runs before making an implementation decision.
 
 ## Candidate hashes
 

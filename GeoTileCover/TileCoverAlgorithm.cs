@@ -185,6 +185,15 @@ internal static class TileCoverAlgorithm
             return true;
         }
 
+        // A covered polygon branch needs no more geometry predicates. Keep adding
+        // descendants through the accumulator so overlaps, limits, and cancellation
+        // behave exactly as they do during ordinary traversal. Tiny bounded requests
+        // retain the original early-exit path without extra coverage predicates.
+        if (source is Polygon && result.UseCoveredBranchFastPath && prepared.Covers(tileGeometry))
+        {
+            return result.TryAddDescendants(tile, targetZoom);
+        }
+
         var z = tile.Z + 1;
         var x = tile.X << 1;
         var y = tile.Y << 1;

@@ -1,5 +1,7 @@
 # Geometry coverage baseline, 2026-10-01
 
+For the subsequent optimization, see the [covered polygon branch comparison](COVERED-BRANCH-RESULTS.md). This page preserves the original exploratory run.
+
 The geometry benchmark suite completed all 48 cases against the unchanged library at commit `e8d753631baa85ccc9d6956c74f459e2f79da5c0`, with the new benchmark sources added in the working tree. All 12 fixtures passed topology, tile-budget, full/bounded equality, and minimal-cover expansion checks. [Fixture counts](results/2026-10-01/geometry-workloads.csv), [BenchmarkDotNet report](results/2026-10-01/geometry-benchmark-report.md), and [CSV](results/2026-10-01/geometry-benchmark-report.csv) are retained for reproduction.
 
 ## Run conditions
