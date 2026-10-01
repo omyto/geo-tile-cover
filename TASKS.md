@@ -1,19 +1,14 @@
 # Tasks
 
-## Minimum gate for `0.1.0-preview`
+Remaining work reviewed against the source on 2026-10-01.
 
-- [x] Add basic tests for Point, LineString, Polygon, MultiPolygon, and empty geometry.
-- [x] Define point ownership on tile edges and corners.
-- [x] Exclude neighboring tiles touched only by a polygon boundary.
-- [x] Reject coordinates outside WGS84/Web Mercator bounds.
-- [x] Detect and reject geometry segments crossing the antimeridian.
-- [x] Define LineString ownership when it lies on a tile boundary.
-- [x] Add tests at zoom levels 24 and 25.
-- [x] Run release tests and inspect the rebuilt NuGet package.
+## Performance
 
-## Follow-up
+- [x] Add geometry coverage benchmarks for LineString, Polygon, and MultiPolygon at zooms 8, 16, and 25, measuring runtime and allocations for `GetTiles`, complete/rejected `TryGetTiles`, and `GetMinimalTiles`. Synthetic footprints scale with zoom to bound full output to 1,024 tiles; detailed inputs contain roughly 2,000 vertices. See the [benchmark guide](benchmarks/GeoTileCover.Benchmarks/README.md#geometry-coverage).
+- [ ] Evaluate a fully covered tile fast path for geometry-backed `GetTiles` and `TryGetTiles` against the benchmark baseline; implement only if measurements justify it. Preserve boundary ownership, deduplication, tile limits, and cancellation, and check for regressions on lines and rejected requests. `GetMinimalTiles` already short-circuits fully covered branches.
 
-- [ ] Optimize branches where the geometry fully covers a tile.
-- [ ] Benchmark large geometries and high zoom levels.
-- [ ] Add Source Link and symbol package generation.
-- [ ] Add CI and Trusted Publishing for NuGet releases.
+## Packaging and releases
+
+- [ ] Generate a `.snupkg` symbol package and verify its portable PDBs and Source Link mappings. The current SDK already enables Source Link and generates a mapping to the GitHub commit; symbol packaging is still missing.
+- [ ] Add CI to run Release builds and tests with Microsoft Testing Platform, build the sample and benchmark projects, and validate package artifacts. Ensure the test invocation works with the selected SDK.
+- [ ] Add a NuGet release workflow using Trusted Publishing and verify the matching trust configuration on NuGet.org. No release workflow exists in the repository; the account-side configuration has not been verified.

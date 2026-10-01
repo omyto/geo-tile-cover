@@ -1,0 +1,13 @@
+Workload,Zoom,Vertices,FullTiles,MinimalTiles,RejectedAt
+FullTilePolygon,8,5,1024,1,8
+FullTilePolygon,16,5,1024,1,8
+FullTilePolygon,25,5,1024,1,8
+DetailedLine,8,2049,450,300,8
+DetailedLine,16,2049,462,318,8
+DetailedLine,25,2049,462,318,8
+PolygonWithHole,8,2562,694,154,8
+PolygonWithHole,16,2562,704,152,8
+PolygonWithHole,25,2562,708,156,8
+MultiPolygon,8,2052,736,232,8
+MultiPolygon,16,2052,720,288,8
+MultiPolygon,25,2052,720,288,8
